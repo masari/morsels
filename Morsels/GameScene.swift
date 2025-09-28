@@ -130,7 +130,13 @@ class GameScene: SKScene {
         for touch in touches {
             let location = touch.location(in: self)
             let hitNodes = nodes(at: location)
-            for node in hitNodes {
+            
+            // Process all balls at this location (for smooth swiping)
+            let ballNodes = hitNodes.filter { node in
+                node.name == "ball" || node.parent?.name == "ball"
+            }
+            
+            for node in ballNodes {
                 var ballToRemove: SKNode?
                 var selectedLetter: Character?
                 
@@ -152,7 +158,6 @@ class GameScene: SKScene {
                 if let ball = ballToRemove, let letter = selectedLetter {
                     selectedOrder.append(letter)
                     ball.removeFromParent()
-                    break // Only handle one ball per touch
                 }
             }
         }
