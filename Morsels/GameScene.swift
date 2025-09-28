@@ -9,6 +9,11 @@ class GameScene: SKScene {
     private var nextRoundScheduled = false
     // Delay before playing Morse code for the next round
     private let nextRoundDelay: TimeInterval = 5.0
+    
+    // Scoring system
+    private var score: Int = 0
+    private var scoreLabel: SKLabelNode!
+    private var selectedOrder: [Character] = []
 
     override func didMove(to view: SKView) {
         // White background so balls are clearly visible
@@ -30,6 +35,16 @@ class GameScene: SKScene {
         
         physicsBody = SKPhysicsBody(edgeChainFrom: borderPath)
         physicsBody?.friction = 0.0
+
+        // Create and position score label in upper right corner
+        scoreLabel = SKLabelNode(text: "Score: \(score)")
+        scoreLabel.fontName = "Helvetica-Bold"
+        scoreLabel.fontSize = 24
+        scoreLabel.fontColor = .black
+        scoreLabel.horizontalAlignmentMode = .right
+        scoreLabel.verticalAlignmentMode = .top
+        scoreLabel.position = CGPoint(x: size.width - 20, y: size.height - 20)
+        addChild(scoreLabel)
 
         // Start first round with same pattern as subsequent rounds
         nextRoundScheduled = true // Prevent update() from interfering with first round
@@ -116,11 +131,28 @@ class GameScene: SKScene {
             let location = touch.location(in: self)
             let hitNodes = nodes(at: location)
             for node in hitNodes {
-                // Remove the ball shape (parent of label) if hit
+                var ballToRemove: SKNode?
+                var selectedLetter: Character?
+                
+                // Find the ball and its letter
                 if node.name == "ball" {
-                    node.removeFromParent()
+                    ballToRemove = node
+                    if let label = node.children.compactMap({ $0 as? SKLabelNode }).first,
+                       let text = label.text?.uppercased().first {
+                        selectedLetter = text
+                    }
                 } else if node.parent?.name == "ball" {
-                    node.parent?.removeFromParent()
+                    ballToRemove = node.parent
+                    if let text = (node as? SKLabelNode)?.text?.uppercased().first {
+                        selectedLetter = text
+                    }
+                }
+                
+                // Record the selection and remove the ball
+                if let ball = ballToRemove, let letter = selectedLetter {
+                    selectedOrder.append(letter)
+                    ball.removeFromParent()
+                    break // Only handle one ball per touch
                 }
             }
         }
@@ -133,9 +165,26 @@ class GameScene: SKScene {
                 ball.removeFromParent()
             }
         }
-        // When all balls are gone, schedule the next round with Morse during the delay
+        
+        // When all balls are gone, check if they were selected in correct order
         let remaining = children.filter { $0.name == "ball" }
         if remaining.isEmpty && !nextRoundScheduled {
+            // Check if player selected all balls in correct order
+            if selectedOrder == roundLetters {
+                score += 100
+                scoreLabel.text = "Score: \(score)"
+                // Optional: add visual feedback for correct answer
+                let flashAction = SKAction.sequence([
+                    .run { self.scoreLabel.fontColor = .green },
+                    .wait(forDuration: 0.5),
+                    .run { self.scoreLabel.fontColor = .black }
+                ])
+                scoreLabel.run(flashAction)
+            }
+            
+            // Reset for next round
+            selectedOrder.removeAll()
+            
             nextRoundScheduled = true
             // Prepare next round letters and timings
             let newLetters = generateRoundLetters()

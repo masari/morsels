@@ -26,6 +26,15 @@ class MorseCodePlayer {
     private let letterGapBuffer: AVAudioPCMBuffer
 
     private init() {
+        // Configure audio session first
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try session.setActive(true)
+        } catch {
+            print("Failed to configure audio session: \(error)")
+        }
+        
         // Attach & connect player
         engine.attach(player)
         let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
@@ -38,8 +47,13 @@ class MorseCodePlayer {
         letterGapBuffer = MorseCodePlayer.makeSilenceBuffer(duration: 0.3, sampleRate: sampleRate)
 
         // Start engine
-        do { try engine.start() }
-        catch { print("Audio engine start error:", error) }
+        do { 
+            try engine.start() 
+            print("Audio engine started successfully")
+        }
+        catch { 
+            print("Audio engine start error:", error) 
+        }
     }
 
     /// Generate sine‐wave buffer
@@ -71,15 +85,6 @@ class MorseCodePlayer {
 
     /// Play given letters as Morse code beeps.
     func play(letters: [Character]) {
-        // Activate session with better error handling
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-            try session.setActive(true)
-        } catch {
-            print("Failed to configure audio session: \(error)")
-        }
-
         player.stop()
         var buffers: [AVAudioPCMBuffer] = []
         for (idx, ch) in letters.enumerated() {
