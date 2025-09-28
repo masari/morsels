@@ -24,6 +24,16 @@ class GameScene: SKScene {
     private let streakBonusPoints: Int = 25
     private let streakBonusInterval: Int = 3  // Bonus every 3 perfect rounds
     private var perfectRoundStreak: Int = 0
+    
+    // Progressive learning system
+    private let letterProgression: [Character] = ["E", "T", "I", "A", "N", "M", "S", "U", "R", "W", "D", "K", "G", "O", "H", "V", "F", "L", "P", "J", "B", "X", "C", "Y", "Z", "Q"]
+    private var currentLearningStage: Int = 0
+    private var letterStats: [Character: (correct: Int, total: Int)] = [:]
+    private let masteryThreshold: Int = 5  // Need 5 correct attempts to master a letter
+    private let minAccuracyForAdvancement: Double = 0.8  // 80% accuracy required
+    
+    // UI for learning progress
+    private var progressLabel: SKLabelNode!
 
     override func didMove(to view: SKView) {
         // White background so balls are clearly visible
@@ -55,6 +65,19 @@ class GameScene: SKScene {
         scoreLabel.verticalAlignmentMode = .top
         scoreLabel.position = CGPoint(x: size.width - 20, y: size.height - 20)
         addChild(scoreLabel)
+        
+        // Create progress label
+        progressLabel = SKLabelNode(text: updateProgressText())
+        progressLabel.fontName = "Helvetica"
+        progressLabel.fontSize = 16
+        progressLabel.fontColor = .darkGray
+        progressLabel.horizontalAlignmentMode = .left
+        progressLabel.verticalAlignmentMode = .top
+        progressLabel.position = CGPoint(x: 20, y: size.height - 20)
+        addChild(progressLabel)
+
+        // Initialize learning stats for starting letters
+        initializeLearningStats()
 
         // Start first round with same pattern as subsequent rounds
         nextRoundScheduled = true // Prevent update() from interfering with first round
@@ -74,11 +97,79 @@ class GameScene: SKScene {
         run(seq)
     }
 
-    // Generate a random set of letters for the round
+    // Initialize learning statistics
+    private func initializeLearningStats() {
+        // Start with first 3 letters
+        currentLearningStage = min(2, letterProgression.count - 1)
+        for i in 0...currentLearningStage {
+            letterStats[letterProgression[i]] = (correct: 0, total: 0)
+        }
+    }
+    
+    // Generate letters based on current learning stage
     private func generateRoundLetters() -> [Character] {
-        let count = Int.random(in: 1...4)
-        let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        return (0..<count).compactMap { _ in alphabet.randomElement() }
+        let availableLetters = Array(letterProgression[0...currentLearningStage])
+        let count = Int.random(in: 1...min(4, availableLetters.count))
+        return (0..<count).compactMap { _ in availableLetters.randomElement() }
+    }
+    
+    // Update progress text for display
+    private func updateProgressText() -> String {
+        let availableCount = currentLearningStage + 1
+        let totalCount = letterProgression.count
+        return "Learning: \(availableCount)/\(totalCount) letters"
+    }
+    
+    // Check if ready to advance to next learning stage
+    private func checkForAdvancement() {
+        guard currentLearningStage < letterProgression.count - 1 else { return }
+        
+        // Check if current letters are mastered
+        var canAdvance = true
+        for i in 0...currentLearningStage {
+            let letter = letterProgression[i]
+            if let stats = letterStats[letter] {
+                let accuracy = stats.total > 0 ? Double(stats.correct) / Double(stats.total) : 0.0
+                if stats.correct < masteryThreshold || accuracy < minAccuracyForAdvancement {
+                    canAdvance = false
+                    break
+                }
+            } else {
+                canAdvance = false
+                break
+            }
+        }
+        
+        if canAdvance {
+            currentLearningStage += 1
+            let newLetter = letterProgression[currentLearningStage]
+            letterStats[newLetter] = (correct: 0, total: 0)
+            progressLabel.text = updateProgressText()
+            
+            // Visual feedback for new letter unlocked
+            let celebrateAction = SKAction.sequence([
+                .run { self.progressLabel.fontColor = .green },
+                .wait(forDuration: 1.0),
+                .run { self.progressLabel.fontColor = .darkGray }
+            ])
+            progressLabel.run(celebrateAction)
+            
+            print("🎉 New letter unlocked: \(newLetter)! Stage: \(currentLearningStage + 1)")
+        }
+    }
+    
+    // Update learning statistics
+    private func updateLearningStats(selectedLetters: [Character], correctLetters: [Character]) {
+        // Track statistics for each letter that was supposed to be selected
+        for (index, letter) in correctLetters.enumerated() {
+            if var stats = letterStats[letter] {
+                stats.total += 1
+                if index < selectedLetters.count && selectedLetters[index] == letter {
+                    stats.correct += 1
+                }
+                letterStats[letter] = stats
+            }
+        }
     }
 
     // Calculate approximate total Morse code play duration
@@ -184,6 +275,9 @@ class GameScene: SKScene {
         // When all balls are gone, calculate partial credit for correct sequence
         let remaining = children.filter { $0.name == "ball" }
         if remaining.isEmpty && !nextRoundScheduled {
+            // Update learning statistics
+            updateLearningStats(selectedLetters: selectedOrder, correctLetters: roundLetters)
+            
             // Calculate partial credit: points per correct letter in sequence
             var correctInSequence = 0
             for i in 0..<min(selectedOrder.count, roundLetters.count) {
@@ -251,6 +345,9 @@ class GameScene: SKScene {
                 perfectRoundStreak = 0
                 print("Perfect round streak reset to 0")
             }
+            
+            // Check if ready to advance to next learning stage
+            checkForAdvancement()
             
             // Reset for next round
             selectedOrder.removeAll()
