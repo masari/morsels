@@ -71,10 +71,14 @@ class MorseCodePlayer {
 
     /// Play given letters as Morse code beeps.
     func play(letters: [Character]) {
-        // Activate session
+        // Activate session with better error handling
         let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback)
-        try? session.setActive(true)
+        do {
+            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try session.setActive(true)
+        } catch {
+            print("Failed to configure audio session: \(error)")
+        }
 
         player.stop()
         var buffers: [AVAudioPCMBuffer] = []
@@ -88,6 +92,10 @@ class MorseCodePlayer {
                 buffers.append(letterGapBuffer)
             }
         }
+
+        // Debug: Print what we're about to play
+        let letterString = letters.map(String.init).joined()
+        print("Playing Morse code for: \(letterString)")
 
         // Schedule sequentially
         var time: AVAudioTime? = nil

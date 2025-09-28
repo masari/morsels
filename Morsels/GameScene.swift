@@ -5,6 +5,10 @@ class GameScene: SKScene {
 
     private let ballRadius: CGFloat = 30.0
     private var roundLetters: [Character] = []
+    // Tracks whether we've already scheduled the next round
+    private var nextRoundScheduled = false
+    // Delay before playing Morse code for the next round
+    private let nextRoundDelay: TimeInterval = 5.0
 
     override func didMove(to view: SKView) {
         // White background so balls are clearly visible
@@ -13,16 +17,36 @@ class GameScene: SKScene {
         // Gentle gravity
         physicsWorld.gravity = CGVector(dx: 0, dy: -0.5)
 
-        // Scene boundary at edges
-        physicsBody = SKPhysicsBody(edgeLoopFrom: frame)
+        // Scene boundary only at left, right, and top edges (not bottom)
+        let borderPath = CGMutablePath()
+        // Left edge
+        borderPath.move(to: CGPoint(x: 0, y: 0))
+        borderPath.addLine(to: CGPoint(x: 0, y: frame.height))
+        // Top edge
+        borderPath.addLine(to: CGPoint(x: frame.width, y: frame.height))
+        // Right edge
+        borderPath.addLine(to: CGPoint(x: frame.width, y: 0))
+        // Note: we don't close the path to the bottom, leaving it open
+        
+        physicsBody = SKPhysicsBody(edgeChainFrom: borderPath)
         physicsBody?.friction = 0.0
 
-        // Determine letters for this round and play Morse code
+        // Start first round with same pattern as subsequent rounds
+        nextRoundScheduled = true // Prevent update() from interfering with first round
         roundLetters = generateRoundLetters()
-        MorseCodePlayer.shared.play(letters: roundLetters)
-        // Delay spawning until after code finishes
-        let totalDuration = calculateMorseDuration(for: roundLetters)
-        run(.sequence([.wait(forDuration: totalDuration), .run { self.spawnRoundBalls() }]))
+        let morseDuration = calculateMorseDuration(for: roundLetters)
+        let morseStartDelay = max(0.5, nextRoundDelay - morseDuration - 0.5)
+        
+        let seq = SKAction.sequence([
+            .wait(forDuration: morseStartDelay),
+            .run { MorseCodePlayer.shared.play(letters: self.roundLetters) },
+            .wait(forDuration: nextRoundDelay - morseStartDelay),
+            .run { [weak self] in
+                self?.spawnRoundBalls()
+                self?.nextRoundScheduled = false // Now allow update() to manage subsequent rounds
+            }
+        ])
+        run(seq)
     }
 
     // Generate a random set of letters for the round
@@ -109,10 +133,29 @@ class GameScene: SKScene {
                 ball.removeFromParent()
             }
         }
-        // When all balls are gone, spawn next round
+        // When all balls are gone, schedule the next round with Morse during the delay
         let remaining = children.filter { $0.name == "ball" }
-        if remaining.isEmpty {
-            spawnRoundBalls()
+        if remaining.isEmpty && !nextRoundScheduled {
+            nextRoundScheduled = true
+            // Prepare next round letters and timings
+            let newLetters = generateRoundLetters()
+            let morseDuration = calculateMorseDuration(for: newLetters)
+            roundLetters = newLetters
+            
+            // Calculate when to play Morse so it finishes right before balls spawn
+            let morseStartDelay = max(0.5, nextRoundDelay - morseDuration - 0.5) // Play Morse near end of delay
+            
+            // Sequence: wait, play Morse, wait for Morse + remaining time, then spawn balls
+            let seq = SKAction.sequence([
+                .wait(forDuration: morseStartDelay),
+                .run { MorseCodePlayer.shared.play(letters: newLetters) },
+                .wait(forDuration: nextRoundDelay - morseStartDelay),
+                .run { [weak self] in
+                    self?.spawnRoundBalls()
+                    self?.nextRoundScheduled = false
+                }
+            ])
+            run(seq)
         }
     }
 
@@ -128,11 +171,5 @@ class GameScene: SKScene {
         }
         // Play the sequence
         MorseCodePlayer.shared.play(letters: letters)
-    }
-
-    // Example: play code whenever user lifts finger off screen
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        super.touchesEnded(touches, with: event)
-        playActiveBallsInMorse()
     }
 }
