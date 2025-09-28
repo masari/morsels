@@ -14,6 +14,16 @@ class GameScene: SKScene {
     private var score: Int = 0
     private var scoreLabel: SKLabelNode!
     private var selectedOrder: [Character] = []
+    
+    // Configurable scoring parameters
+    private let pointsPerCorrectLetter: Int = 10
+    private let completionBonusPerBall: Int = 50
+    private let minBallsForBonus: Int = 3
+    
+    // Streak bonus configuration
+    private let streakBonusPoints: Int = 25
+    private let streakBonusInterval: Int = 3  // Bonus every 3 perfect rounds
+    private var perfectRoundStreak: Int = 0
 
     override func didMove(to view: SKView) {
         // White background so balls are clearly visible
@@ -171,20 +181,75 @@ class GameScene: SKScene {
             }
         }
         
-        // When all balls are gone, check if they were selected in correct order
+        // When all balls are gone, calculate partial credit for correct sequence
         let remaining = children.filter { $0.name == "ball" }
         if remaining.isEmpty && !nextRoundScheduled {
-            // Check if player selected all balls in correct order
-            if selectedOrder == roundLetters {
-                score += 100
+            // Calculate partial credit: points per correct letter in sequence
+            var correctInSequence = 0
+            for i in 0..<min(selectedOrder.count, roundLetters.count) {
+                if selectedOrder[i] == roundLetters[i] {
+                    correctInSequence += 1
+                } else {
+                    break // Stop at first incorrect letter
+                }
+            }
+            
+            if correctInSequence > 0 {
+                let sequencePoints = correctInSequence * pointsPerCorrectLetter
+                var totalPointsEarned = sequencePoints
+                var isComplete = false
+                var streakBonus = 0
+                
+                // Check for completion bonus
+                if correctInSequence == roundLetters.count && roundLetters.count >= minBallsForBonus {
+                    let completionBonus = completionBonusPerBall * roundLetters.count
+                    totalPointsEarned += completionBonus
+                    isComplete = true
+                    print("Completion bonus: \(completionBonus) points (\(completionBonusPerBall) × \(roundLetters.count) balls)")
+                }
+                
+                // Handle streak tracking and bonuses
+                if correctInSequence == roundLetters.count {
+                    // Perfect round - increment streak
+                    perfectRoundStreak += 1
+                    
+                    // Check for streak bonus
+                    if perfectRoundStreak > 0 && perfectRoundStreak % streakBonusInterval == 0 {
+                        streakBonus = streakBonusPoints * perfectRoundStreak
+                        totalPointsEarned += streakBonus
+                        print("Streak bonus: \(streakBonus) points for \(perfectRoundStreak) perfect rounds!")
+                    }
+                } else {
+                    // Not perfect - reset streak
+                    perfectRoundStreak = 0
+                }
+                
+                score += totalPointsEarned
                 scoreLabel.text = "Score: \(score)"
-                // Optional: add visual feedback for correct answer
+                
+                // Visual feedback - different colors for streaks, complete, or partial
+                let flashColor: UIColor
+                if streakBonus > 0 {
+                    flashColor = .purple  // Purple for streak bonus
+                } else if isComplete {
+                    flashColor = .green   // Green for completion
+                } else {
+                    flashColor = .orange  // Orange for partial
+                }
+                
                 let flashAction = SKAction.sequence([
-                    .run { self.scoreLabel.fontColor = .green },
+                    .run { self.scoreLabel.fontColor = flashColor },
                     .wait(forDuration: 0.5),
                     .run { self.scoreLabel.fontColor = .black }
                 ])
                 scoreLabel.run(flashAction)
+                
+                print("Earned \(totalPointsEarned) points: \(sequencePoints) sequence + \(isComplete ? completionBonusPerBall * roundLetters.count : 0) completion + \(streakBonus) streak")
+                print("Perfect round streak: \(perfectRoundStreak)")
+            } else {
+                // No points earned - reset streak
+                perfectRoundStreak = 0
+                print("Perfect round streak reset to 0")
             }
             
             // Reset for next round
