@@ -1,0 +1,104 @@
+import AVFoundation
+
+/// Singleton that generates and plays Morse code as sine‐wave beeps on the fly.
+class MorseCodePlayer {
+    static let shared = MorseCodePlayer()
+
+    // International Morse Code table for A–Z
+    private let mapping: [Character:String] = [
+        "A":".-", "B":"-...", "C":"-.-.", "D":"-..",
+        "E":".",  "F":"..-.", "G":"--.",  "H":"....",
+        "I":"..", "J":".---", "K":"-.-",  "L":".-..",
+        "M":"--", "N":"-.",   "O":"---",  "P":".--.",
+        "Q":"--.-","R":".-.", "S":"...",  "T":"-",
+        "U":"..-","V":"...-","W":".--",  "X":"-..-",
+        "Y":"-.--","Z":"--.."
+    ]
+
+    private let engine = AVAudioEngine()
+    private let player = AVAudioPlayerNode()
+    private let sampleRate: Double = 44_100
+    private let toneFrequency: Double = 800  // Hz
+
+    private let dotBuffer: AVAudioPCMBuffer
+    private let dashBuffer: AVAudioPCMBuffer
+    private let symbolGapBuffer: AVAudioPCMBuffer
+    private let letterGapBuffer: AVAudioPCMBuffer
+
+    private init() {
+        // Attach & connect player
+        engine.attach(player)
+        let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
+        engine.connect(player, to: engine.mainMixerNode, format: format)
+
+        // Pre‐generate buffers
+        dotBuffer      = MorseCodePlayer.makeToneBuffer(duration: 0.1, sampleRate: sampleRate, freq: toneFrequency)
+        dashBuffer     = MorseCodePlayer.makeToneBuffer(duration: 0.3, sampleRate: sampleRate, freq: toneFrequency)
+        symbolGapBuffer = MorseCodePlayer.makeSilenceBuffer(duration: 0.1, sampleRate: sampleRate)
+        letterGapBuffer = MorseCodePlayer.makeSilenceBuffer(duration: 0.3, sampleRate: sampleRate)
+
+        // Start engine
+        do { try engine.start() }
+        catch { print("Audio engine start error:", error) }
+    }
+
+    /// Generate sine‐wave buffer
+    private static func makeToneBuffer(duration: Double, sampleRate: Double, freq: Double) -> AVAudioPCMBuffer {
+        let frameCount = AVAudioFrameCount(sampleRate * duration)
+        let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
+        let buf = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount)!
+        buf.frameLength = frameCount
+
+        let thetaIncrement = 2.0 * Double.pi * freq / sampleRate
+        var theta: Double = 0
+        let ptr = buf.floatChannelData![0]
+        for i in 0..<Int(frameCount) {
+            ptr[i] = Float(sin(theta))
+            theta += thetaIncrement
+        }
+        return buf
+    }
+
+    /// Generate silence buffer
+    private static func makeSilenceBuffer(duration: Double, sampleRate: Double) -> AVAudioPCMBuffer {
+        let frameCount = AVAudioFrameCount(sampleRate * duration)
+        let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
+        let buf = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount)!
+        buf.frameLength = frameCount
+        memset(buf.floatChannelData![0], 0, Int(frameCount) * MemoryLayout<Float>.size)
+        return buf
+    }
+
+    /// Play given letters as Morse code beeps.
+    func play(letters: [Character]) {
+        // Activate session
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback)
+        try? session.setActive(true)
+
+        player.stop()
+        var buffers: [AVAudioPCMBuffer] = []
+        for (idx, ch) in letters.enumerated() {
+            guard let code = mapping[ch] else { continue }
+            for symbol in code {
+                buffers.append(symbol == "." ? dotBuffer : dashBuffer)
+                buffers.append(symbolGapBuffer)
+            }
+            if idx < letters.count - 1 {
+                buffers.append(letterGapBuffer)
+            }
+        }
+
+        // Schedule sequentially
+        var time: AVAudioTime? = nil
+        for buf in buffers {
+            player.scheduleBuffer(buf, at: time, options: []) {}
+            if let nodeTime = player.lastRenderTime,
+               let playerTime = player.playerTime(forNodeTime: nodeTime) {
+                let next = playerTime.sampleTime + AVAudioFramePosition(buf.frameLength)
+                time = AVAudioTime(sampleTime: next, atRate: sampleRate)
+            }
+        }
+        player.play()
+    }
+}

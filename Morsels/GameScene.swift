@@ -102,4 +102,24 @@ class GameScene: SKScene {
             spawnBalls()
         }
     }
+
+    /// Call this whenever you want to read out all active balls in Morse:
+    func playActiveBallsInMorse() {
+        // Gather letters from all balls currently in the scene
+        let letters: [Character] = children.compactMap { node in
+            guard node.name == "ball",
+                  let lbl = node.children.compactMap({ $0 as? SKLabelNode }).first,
+                  let text = lbl.text?.uppercased().first
+            else { return nil }
+            return text
+        }
+        // Play the sequence
+        MorseCodePlayer.shared.play(letters: letters)
+    }
+
+    // Example: play code whenever user lifts finger off screen
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesEnded(touches, with: event)
+        playActiveBallsInMorse()
+    }
 }
