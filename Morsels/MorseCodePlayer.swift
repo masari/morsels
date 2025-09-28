@@ -5,7 +5,7 @@ class MorseCodePlayer {
     static let shared = MorseCodePlayer()
 
     // International Morse Code table for A–Z
-    private let mapping: [Character:String] = [
+    let mapping: [Character:String] = [
         "A":".-", "B":"-...", "C":"-.-.", "D":"-..",
         "E":".",  "F":"..-.", "G":"--.",  "H":"....",
         "I":"..", "J":".---", "K":"-.-",  "L":".-..",
