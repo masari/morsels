@@ -87,15 +87,7 @@ class GameScene: SKScene {
         ballRadius = radius
 
         // Preload pig textures for better performance
-        PigTextureGenerator.shared.preloadCommonLetters(size: pigSize)
-
-        // Register for memory warnings
-        NotificationCenter.default.addObserver(
-            PigTextureGenerator.shared,
-            selector: #selector(PigTextureGenerator.handleMemoryWarning),
-            name: UIApplication.didReceiveMemoryWarningNotification,
-            object: nil
-        )
+        PigTextureGenerator.shared.preloadCommonLetters()
 
         // Start first round with same pattern as subsequent rounds
         nextRoundScheduled = true // Prevent update() from interfering with first round
@@ -214,7 +206,9 @@ class GameScene: SKScene {
     // Create and add a pig ball showing the given letter
     private func createPigBall(with letter: Character) {
         let pigSize = PigTextureGenerator.shared.recommendedPigSize
-        let pigSprite = SKSpriteNode(pigWithLetter: letter, size: pigSize)
+        let pigTexture = PigTextureGenerator.shared.generatePigTexture(for: letter, size: pigSize)
+        let pigSprite = SKSpriteNode(texture: pigTexture)
+        pigSprite.size = pigSize
         
         let radius = pigSize.width / 2
         let xPos = CGFloat.random(in: radius...(size.width - radius))
@@ -226,32 +220,15 @@ class GameScene: SKScene {
         pigSprite.userData = NSMutableDictionary()
         pigSprite.userData?["letter"] = String(letter)
         
-        // Add animated wings to make the pig fly
-        PigWingAnimator.addAnimatedWings(to: pigSprite)
-        
         // Physics body - using circular body for consistent physics
         let body = SKPhysicsBody(circleOfRadius: radius * 0.8) // Slightly smaller than visual size
         body.affectedByGravity = true
-        body.restitution = 0.5
-        body.linearDamping = CGFloat.random(in: 0.0...0.5)
-        body.velocity = CGVector(dx: 0, dy: CGFloat.random(in: -50 ... -20))
+        body.restitution = 0.7 // Make them bouncier
+        body.linearDamping = 0.1
+        body.angularDamping = 0.5
+        body.velocity = CGVector(dx: CGFloat.random(in: -20...20), dy: CGFloat.random(in: -50 ... -20))
+        body.angularVelocity = CGFloat.random(in: -1...1) // Give them a slight spin
         pigSprite.physicsBody = body
-        
-        // Add gentle floating motion to simulate flying
-        let floatAction = SKAction.sequence([
-            .moveBy(x: CGFloat.random(in: -15...15), y: CGFloat.random(in: -8...8), duration: 2.0 + Double.random(in: -0.5...0.5)),
-            .moveBy(x: CGFloat.random(in: -15...15), y: CGFloat.random(in: -8...8), duration: 2.0 + Double.random(in: -0.5...0.5))
-        ])
-        let floatLoop = SKAction.repeatForever(floatAction)
-        pigSprite.run(floatLoop, withKey: "float")
-        
-        // Add slight rotation for more dynamic movement
-        let rotateAction = SKAction.sequence([
-            .rotate(byAngle: CGFloat.random(in: -0.2...0.2), duration: 1.5 + Double.random(in: -0.3...0.3)),
-            .rotate(byAngle: CGFloat.random(in: -0.2...0.2), duration: 1.5 + Double.random(in: -0.3...0.3))
-        ])
-        let rotateLoop = SKAction.repeatForever(rotateAction)
-        pigSprite.run(rotateLoop, withKey: "rotate")
         
         addChild(pigSprite)
     }
