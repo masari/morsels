@@ -6,13 +6,17 @@ class GameScene: SKScene {
     private let ballRadius: CGFloat = 30.0
 
     override func didMove(to view: SKView) {
-        // Set a mild downward gravity
-        physicsWorld.gravity = CGVector(dx: 0, dy: -1)  // slower global drop
-        // Add scene boundary so balls land on bottom edge
-        self.physicsBody = SKPhysicsBody(edgeLoopFrom: self.frame)
-        self.physicsBody?.friction = 0.0
+        // White background so balls are clearly visible
+        backgroundColor = .white
 
-        // Start with a random batch
+        // Gentle gravity
+        physicsWorld.gravity = CGVector(dx: 0, dy: -0.5)
+
+        // Scene boundary at edges
+        physicsBody = SKPhysicsBody(edgeLoopFrom: frame)
+        physicsBody?.friction = 0.0
+
+        // Spawn initial balls
         spawnBalls()
     }
 
@@ -28,23 +32,24 @@ class GameScene: SKScene {
     private func createBall() {
         // Circle shape
         let ball = SKShapeNode(circleOfRadius: ballRadius)
-        ball.fillColor = .cyan
+        ball.fillColor = .blue
         ball.strokeColor = .clear
-        // Random X, just above top edge
-        ball.position = CGPoint(
-            x: CGFloat.random(in: ballRadius...(size.width - ballRadius)),
-            y: size.height + ballRadius
-        )
+
+        // Position just within top edge so it’s immediately visible
+        let xPos = CGFloat.random(in: ballRadius...(size.width - ballRadius))
+        let yPos = size.height - ballRadius - 10
+        ball.position = CGPoint(x: xPos, y: yPos)
         ball.name = "ball"
 
-        // Physics so it falls
-        ball.physicsBody = SKPhysicsBody(circleOfRadius: ballRadius)
-        ball.physicsBody?.affectedByGravity = true
-        ball.physicsBody?.restitution = 0.5
-        ball.physicsBody?.linearDamping = CGFloat.random(in: 0.0...0.5)  // random damping for varied speed
-        // random initial downward velocity for different speeds
-        let initialSpeed = CGFloat.random(in: -200 ... -50)
-        ball.physicsBody?.velocity = CGVector(dx: 0, dy: initialSpeed)
+        // Physics so it falls with varied speed
+        let body = SKPhysicsBody(circleOfRadius: ballRadius)
+        body.affectedByGravity = true
+        body.restitution = 0.5
+        body.linearDamping = CGFloat.random(in: 0.0...0.5)
+        // give a mild random downward push
+        let initialSpeed = CGFloat.random(in: -50 ... -20)
+        body.velocity = CGVector(dx: 0, dy: initialSpeed)
+        ball.physicsBody = body
 
         // Letter label
         let letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -52,7 +57,7 @@ class GameScene: SKScene {
         let label = SKLabelNode(text: letter)
         label.fontName = "Helvetica-Bold"
         label.fontSize = 20
-        label.fontColor = .black
+        label.fontColor = .white
         label.verticalAlignmentMode = .center
         label.horizontalAlignmentMode = .center
         ball.addChild(label)
