@@ -18,7 +18,7 @@ class GameViewController: UIViewController {
             // Instantiate GameScene in code
             let scene = GameScene(size: skView.bounds.size)
             scene.scaleMode = .aspectFill
-            scene.backgroundColor = .black
+            // Remove background override - let GameScene set its own background
             skView.presentScene(scene)
 
             skView.ignoresSiblingOrder = true

@@ -3,7 +3,7 @@ import GameplayKit
 
 class GameScene: SKScene {
 
-    private let ballRadius: CGFloat = 30.0
+    private var ballRadius: CGFloat = 40.0  // Made mutable for device optimization
     private var roundLetters: [Character] = []
     // Tracks whether we've already scheduled the next round
     private var nextRoundScheduled = false
@@ -36,8 +36,8 @@ class GameScene: SKScene {
     private var progressLabel: SKLabelNode!
 
     override func didMove(to view: SKView) {
-        // White background so balls are clearly visible
-        backgroundColor = .white
+        // Light sky blue background for better pig visibility
+        backgroundColor = SKColor(red: 0.87, green: 0.94, blue: 1.0, alpha: 1.0)
 
         // Gentle gravity
         physicsWorld.gravity = CGVector(dx: 0, dy: -0.5)
@@ -78,6 +78,24 @@ class GameScene: SKScene {
 
         // Initialize learning stats for starting letters
         initializeLearningStats()
+
+        // Set up device-optimized pig size
+        let pigSize = PigTextureGenerator.shared.recommendedPigSize
+        let radius = pigSize.width / 2
+        
+        // Update ball radius for device
+        ballRadius = radius
+
+        // Preload pig textures for better performance
+        PigTextureGenerator.shared.preloadCommonLetters(size: pigSize)
+
+        // Register for memory warnings
+        NotificationCenter.default.addObserver(
+            PigTextureGenerator.shared,
+            selector: #selector(PigTextureGenerator.handleMemoryWarning),
+            name: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil
+        )
 
         // Start first round with same pattern as subsequent rounds
         nextRoundScheduled = true // Prevent update() from interfering with first round
@@ -189,33 +207,53 @@ class GameScene: SKScene {
     // Spawn balls for current round
     private func spawnRoundBalls() {
         for letter in roundLetters {
-            createBall(with: letter)
+            createPigBall(with: letter)
         }
     }
 
-    // Create and add a ball showing the given letter
-    private func createBall(with letter: Character) {
-        let ball = SKShapeNode(circleOfRadius: ballRadius)
-        ball.fillColor = .blue
-        ball.strokeColor = .clear
-        let xPos = CGFloat.random(in: ballRadius...(size.width - ballRadius))
-        let yPos = size.height - ballRadius - 10
-        ball.position = CGPoint(x: xPos, y: yPos)
-        ball.name = "ball"
-        let body = SKPhysicsBody(circleOfRadius: ballRadius)
+    // Create and add a pig ball showing the given letter
+    private func createPigBall(with letter: Character) {
+        let pigSize = PigTextureGenerator.shared.recommendedPigSize
+        let pigSprite = SKSpriteNode(pigWithLetter: letter, size: pigSize)
+        
+        let radius = pigSize.width / 2
+        let xPos = CGFloat.random(in: radius...(size.width - radius))
+        let yPos = size.height - radius - 10
+        pigSprite.position = CGPoint(x: xPos, y: yPos)
+        pigSprite.name = "ball"
+        
+        // Store the letter in userData for easy retrieval
+        pigSprite.userData = NSMutableDictionary()
+        pigSprite.userData?["letter"] = String(letter)
+        
+        // Add animated wings to make the pig fly
+        PigWingAnimator.addAnimatedWings(to: pigSprite)
+        
+        // Physics body - using circular body for consistent physics
+        let body = SKPhysicsBody(circleOfRadius: radius * 0.8) // Slightly smaller than visual size
         body.affectedByGravity = true
         body.restitution = 0.5
         body.linearDamping = CGFloat.random(in: 0.0...0.5)
         body.velocity = CGVector(dx: 0, dy: CGFloat.random(in: -50 ... -20))
-        ball.physicsBody = body
-        let label = SKLabelNode(text: String(letter))
-        label.fontName = "Helvetica-Bold"
-        label.fontSize = 20
-        label.fontColor = .white
-        label.verticalAlignmentMode = .center
-        label.horizontalAlignmentMode = .center
-        ball.addChild(label)
-        addChild(ball)
+        pigSprite.physicsBody = body
+        
+        // Add gentle floating motion to simulate flying
+        let floatAction = SKAction.sequence([
+            .moveBy(x: CGFloat.random(in: -15...15), y: CGFloat.random(in: -8...8), duration: 2.0 + Double.random(in: -0.5...0.5)),
+            .moveBy(x: CGFloat.random(in: -15...15), y: CGFloat.random(in: -8...8), duration: 2.0 + Double.random(in: -0.5...0.5))
+        ])
+        let floatLoop = SKAction.repeatForever(floatAction)
+        pigSprite.run(floatLoop, withKey: "float")
+        
+        // Add slight rotation for more dynamic movement
+        let rotateAction = SKAction.sequence([
+            .rotate(byAngle: CGFloat.random(in: -0.2...0.2), duration: 1.5 + Double.random(in: -0.3...0.3)),
+            .rotate(byAngle: CGFloat.random(in: -0.2...0.2), duration: 1.5 + Double.random(in: -0.3...0.3))
+        ])
+        let rotateLoop = SKAction.repeatForever(rotateAction)
+        pigSprite.run(rotateLoop, withKey: "rotate")
+        
+        addChild(pigSprite)
     }
 
     // Handle taps and swipes
@@ -232,35 +270,68 @@ class GameScene: SKScene {
             let location = touch.location(in: self)
             let hitNodes = nodes(at: location)
             
-            // Process all balls at this location (for smooth swiping)
+            // Process all pig balls at this location
             let ballNodes = hitNodes.filter { node in
-                node.name == "ball" || node.parent?.name == "ball"
+                node.name == "ball"
             }
             
-            for node in ballNodes {
-                var ballToRemove: SKNode?
-                var selectedLetter: Character?
+            for pigNode in ballNodes {
+                guard let pigSprite = pigNode as? SKSpriteNode,
+                      let letterString = pigSprite.userData?["letter"] as? String,
+                      let letter = letterString.first else { continue }
                 
-                // Find the ball and its letter
-                if node.name == "ball" {
-                    ballToRemove = node
-                    if let label = node.children.compactMap({ $0 as? SKLabelNode }).first,
-                       let text = label.text?.uppercased().first {
-                        selectedLetter = text
-                    }
-                } else if node.parent?.name == "ball" {
-                    ballToRemove = node.parent
-                    if let text = (node as? SKLabelNode)?.text?.uppercased().first {
-                        selectedLetter = text
-                    }
-                }
+                // Record the selection and remove the pig
+                selectedOrder.append(letter)
                 
-                // Record the selection and remove the ball
-                if let ball = ballToRemove, let letter = selectedLetter {
-                    selectedOrder.append(letter)
-                    ball.removeFromParent()
-                }
+                // Create a sparkle effect when pig is tapped
+                createSparkleEffect(at: pigSprite.position)
+                
+                // Scale down and fade out the pig
+                let disappearAction = SKAction.group([
+                    .scale(to: 0.1, duration: 0.3),
+                    .fadeOut(withDuration: 0.3),
+                    .rotate(byAngle: CGFloat.pi * 2, duration: 0.3)
+                ])
+                
+                let removeAction = SKAction.sequence([
+                    disappearAction,
+                    .removeFromParent()
+                ])
+                
+                pigSprite.run(removeAction)
             }
+        }
+    }
+    
+    // Create sparkle effect for pig selection
+    private func createSparkleEffect(at position: CGPoint) {
+        for _ in 0..<8 {
+            let sparkle = SKShapeNode(circleOfRadius: 3)
+            sparkle.fillColor = .yellow
+            sparkle.strokeColor = .orange
+            sparkle.position = position
+            sparkle.alpha = 1.0
+            
+            let randomAngle = CGFloat.random(in: 0...(2 * CGFloat.pi))
+            let randomDistance = CGFloat.random(in: 20...40)
+            let randomDuration = Double.random(in: 0.5...1.0)
+            
+            let moveAction = SKAction.move(
+                by: CGVector(
+                    dx: cos(randomAngle) * randomDistance,
+                    dy: sin(randomAngle) * randomDistance
+                ),
+                duration: randomDuration
+            )
+            
+            let fadeAction = SKAction.fadeOut(withDuration: randomDuration)
+            let scaleAction = SKAction.scale(to: 0.1, duration: randomDuration)
+            
+            let combined = SKAction.group([moveAction, fadeAction, scaleAction])
+            let sequence = SKAction.sequence([combined, .removeFromParent()])
+            
+            addChild(sparkle)
+            sparkle.run(sequence)
         }
     }
 
