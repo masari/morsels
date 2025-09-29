@@ -5,6 +5,7 @@ enum GameScreen {
     case splash
     case playing
     case instructions
+    case scoring // Add the missing screen state
     case configuration
 }
 

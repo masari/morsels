@@ -22,9 +22,19 @@ struct InstructionsView: View {
                 InstructionRow(icon: "🔥", text: "**Watch Out:** A round is lost if you fail to save at least one pig, earning you a 🍖. Collect three 🍖 and the game is over!")
 
                 Spacer()
+                
+                Button("Scoring Details") {
+                    gameState.currentScreen = .scoring
+                }
+                .font(.headline)
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+                .padding(.bottom, 10)
 
                 Button(action: {
-                    // Change the game state to return to the splash screen
                     gameState.currentScreen = .splash
                 }) {
                     HStack {
@@ -40,23 +50,6 @@ struct InstructionsView: View {
                 }
             }
             .padding(30)
-        }
-    }
-}
-
-// A helper view to format each instruction row consistently.
-struct InstructionRow: View {
-    let icon: String
-    let text: LocalizedStringKey
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 15) {
-            Text(icon)
-                .font(.largeTitle)
-            Text(text)
-                .font(.body)
-                .lineSpacing(5)
-            Spacer()
         }
     }
 }
