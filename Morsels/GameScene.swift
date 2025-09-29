@@ -220,14 +220,26 @@ class GameScene: SKScene {
         pigSprite.userData = NSMutableDictionary()
         pigSprite.userData?["letter"] = String(letter)
         
-        // Physics body - using circular body for consistent physics
-        let body = SKPhysicsBody(circleOfRadius: radius * 0.8) // Slightly smaller than visual size
+        // Create a more precise physics body that matches the pig's shape.
+        // This combines a circle for the body and a rectangle for the sign.
+        let bodyCenter = CGPoint(x: 0, y: -pigSize.height * 0.1)
+        let bodyRadius = pigSize.width * 0.35 // Tighter radius for the main body
+        let bodyCircle = SKPhysicsBody(circleOfRadius: bodyRadius, center: bodyCenter)
+        
+        let signSize = CGSize(width: pigSize.width * 0.8, height: pigSize.height * 0.3)
+        let signCenter = CGPoint(x: 0, y: pigSize.height * 0.3)
+        let bodyRectangle = SKPhysicsBody(rectangleOf: signSize, center: signCenter)
+
+        // Combine the shapes to create a compound physics body.
+        let body = SKPhysicsBody(bodies: [bodyCircle, bodyRectangle])
+        
+        // Adjust physics properties for a more controlled feel.
         body.affectedByGravity = true
-        body.restitution = 0.7 // Make them bouncier
-        body.linearDamping = 0.1
-        body.angularDamping = 0.5
-        body.velocity = CGVector(dx: CGFloat.random(in: -20...20), dy: CGFloat.random(in: -50 ... -20))
-        body.angularVelocity = CGFloat.random(in: -1...1) // Give them a slight spin
+        body.restitution = 0.4 // Less bouncy
+        body.linearDamping = 0.3
+        body.angularDamping = 0.8
+        body.velocity = CGVector(dx: CGFloat.random(in: -15...15), dy: CGFloat.random(in: -40 ... -15))
+        body.angularVelocity = CGFloat.random(in: -0.5...0.5)
         pigSprite.physicsBody = body
         
         addChild(pigSprite)
