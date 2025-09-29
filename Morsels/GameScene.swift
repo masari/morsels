@@ -42,8 +42,10 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private let minAccuracyForAdvancement: Double = 0.8
     private var progressLabel: SKLabelNode!
 
+    // Scene Nodes
     private var grillBackground: SKSpriteNode!
     private var grillForeground: SKSpriteNode!
+    private var pigpen: SKSpriteNode!
 
     override func didMove(to view: SKView) {
         backgroundColor = SKColor(red: 0.87, green: 0.94, blue: 1.0, alpha: 1.0)
@@ -61,6 +63,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
         setupBarbecueGrill()
         setupUI()
+        setupPigpen() // Add the pigpen to the scene
         
         initializeLearningStats()
         
@@ -74,8 +77,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     // MARK: - Setup Methods
     
     private func setupUI() {
-        // Determine the top safe area inset to avoid the notch.
-        // We'll use a default padding of 20 if the safe area is not available.
         let topPadding = self.view?.safeAreaInsets.top ?? 20.0
         
         scoreLabel = SKLabelNode(text: "Score: \(score)")
@@ -84,7 +85,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         scoreLabel.fontColor = .black
         scoreLabel.horizontalAlignmentMode = .right
         scoreLabel.verticalAlignmentMode = .top
-        // Position the label relative to the safe area, not the screen edge.
         scoreLabel.position = CGPoint(x: size.width - 20, y: size.height - topPadding)
         addChild(scoreLabel)
         
@@ -94,7 +94,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         progressLabel.fontColor = .darkGray
         progressLabel.horizontalAlignmentMode = .left
         progressLabel.verticalAlignmentMode = .top
-        // Position the label relative to the safe area as well.
         progressLabel.position = CGPoint(x: 20, y: size.height - topPadding)
         addChild(progressLabel)
     }
@@ -138,6 +137,27 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         grillForeground.run(SKAction.repeatForever(foregroundAnimation))
     }
     
+    private func setupPigpen() {
+        let topPadding = self.view?.safeAreaInsets.top ?? 20.0
+        let penSize = CGSize(width: size.width * 0.6, height: size.height * 0.15)
+        
+        let penTexture = PigpenGenerator.shared.generatePigpenTexture(size: penSize)
+        pigpen = SKSpriteNode(texture: penTexture)
+        pigpen.size = penSize
+        
+        // Position it below the top labels, adding more padding to show the hams.
+        let labelsBottomY = size.height - topPadding - progressLabel.frame.height
+        // Increased the padding from 10 to 50 to push the pigpen down.
+        pigpen.position = CGPoint(x: size.width / 2, y: labelsBottomY - (penSize.height / 2) - 50)
+        
+        // Place it deep in the background
+        pigpen.zPosition = -2
+        
+        addChild(pigpen)
+    }
+    
+    // MARK: - Game Logic
+    
     private func startNextRound() {
         nextRoundScheduled = true
         selectedOrder.removeAll()
@@ -163,7 +183,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         let pigTexture = PigTextureGenerator.shared.generatePigTexture(for: letter, size: pigSize)
         let pigSprite = SKSpriteNode(texture: pigTexture)
         pigSprite.size = pigSize
-        pigSprite.zPosition = 0 // Positioned between grill layers
+        pigSprite.zPosition = 0
         
         let radius = pigSize.width / 2
         pigSprite.position = CGPoint(x: CGFloat.random(in: radius...(size.width - radius)), y: size.height - radius - 10)
@@ -179,7 +199,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         body.restitution = 0.4
         body.linearDamping = 0.3
         body.angularDamping = 0.8
-        // Set horizontal velocity (dx) to 0 as you suggested.
         body.velocity = CGVector(dx: 0, dy: CGFloat.random(in: -40 ... -15))
         body.angularVelocity = CGFloat.random(in: -0.5...0.5)
         
@@ -189,13 +208,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         pigSprite.physicsBody = body
         addChild(pigSprite)
-        
-        // After a short delay, enable contact tests with the flame.
-        let wait = SKAction.wait(forDuration: 0.5)
-        let enableContact = SKAction.run {
-            pigSprite.physicsBody?.contactTestBitMask = PhysicsCategory.flame
-        }
-        pigSprite.run(SKAction.sequence([wait, enableContact]))
     }
     
     // MARK: - Physics Contact Delegate
@@ -256,6 +268,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         smokeEmitter.run(removeAction)
     }
 
+    // MARK: - Touches and Input Handling
+    
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         if isGameOver {
             restartGame()
@@ -299,8 +313,15 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
                     
                     pigSprite.physicsBody = nil
                     
-                    let disappearAction = SKAction.group([.scale(to: 0.1, duration: 0.3), .fadeOut(withDuration: 0.3)])
-                    pigSprite.run(SKAction.sequence([disappearAction, .removeFromParent()]))
+                    // --- NEW: "Fly to Pen" Animation ---
+                    let flyToPen = SKAction.move(to: pigpen.position, duration: 0.5)
+                    flyToPen.timingMode = .easeInEaseOut
+                    
+                    let scaleDown = SKAction.scale(to: 0.1, duration: 0.5)
+                    
+                    let savedAction = SKAction.group([flyToPen, scaleDown])
+                    pigSprite.run(SKAction.sequence([savedAction, .removeFromParent()]))
+                    
                 } else {
                     triggerPenalty()
                     return
@@ -322,6 +343,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         run(SKAction.sequence([.wait(forDuration: penaltyDuration + 0.3), .run { [weak self] in self?.isPenaltyActive = false }]))
     }
 
+    // MARK: - Game State and Update Loop
+    
     override func update(_ currentTime: TimeInterval) {
         children.forEach { node in
             if node.name == "ball" && node.position.y < -ballRadius {
@@ -462,6 +485,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         overlay.run(SKAction.fadeAlpha(to: 0.7, duration: 0.5))
     }
     
+    // MARK: - Helper Methods
+    
     private func updateFailureDisplay() {
         failureIndicatorNodes.forEach { $0.removeFromParent() }
         failureIndicatorNodes.removeAll()
@@ -479,7 +504,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             let hamLabel = SKLabelNode(text: "🍖")
             hamLabel.fontSize = 30
             let xPos = startX + (hamWidth / 2) + (CGFloat(i) * (hamWidth + spacing))
-            let yPos = scoreLabel.position.y - scoreLabel.frame.height - 20
+            // Increased the vertical padding from 20 to 35 to lower the emoji.
+            let yPos = scoreLabel.position.y - scoreLabel.frame.height - 35
             hamLabel.position = CGPoint(x: xPos, y: yPos)
             addChild(hamLabel)
             failureIndicatorNodes.append(hamLabel)
