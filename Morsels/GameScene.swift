@@ -1,11 +1,10 @@
 import SpriteKit
 import GameplayKit
 
-// MARK: - Physics Categories
 struct PhysicsCategory {
     static let none: UInt32 = 0
-    static let pig: UInt32 = 0b1 // 1
-    static let flame: UInt32 = 0b10 // 2
+    static let pig: UInt32 = 0b1
+    static let flame: UInt32 = 0b10
 }
 
 class GameScene: SKScene, SKPhysicsContactDelegate {
@@ -17,17 +16,14 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private var isPenaltyActive = false
     private let fallingSpeed: CGFloat = -0.4
     
-    // Game Over
     private let maxFailedRounds = 3
     private var failedRoundsCounter = 0
     private var isGameOver = false
     private let gameOverDelay: TimeInterval = 1.0
     private var failureIndicatorNodes: [SKLabelNode] = []
     
-    // Round Timing
     private let nextRoundDelay: TimeInterval = 5.0
     
-    // Scoring
     private var score: Int = 0
     private var scoreLabel: SKLabelNode!
     private var selectedOrder: [Character] = []
@@ -35,12 +31,10 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private let completionBonusPerBall: Int = 50
     private let minBallsForBonus: Int = 3
     
-    // Streak Bonus
     private let streakBonusPoints: Int = 25
     private let streakBonusInterval: Int = 3
     private var perfectRoundStreak: Int = 0
     
-    // Learning System
     private let letterProgression: [Character] = ["E", "T", "I", "A", "N", "M", "S", "U", "R", "W", "D", "K", "G", "O", "H", "V", "F", "L", "P", "J", "B", "X", "C", "Y", "Z", "Q"]
     private var currentLearningStage: Int = 0
     private var letterStats: [Character: (correct: Int, total: Int)] = [:]
@@ -48,17 +42,15 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private let minAccuracyForAdvancement: Double = 0.8
     private var progressLabel: SKLabelNode!
 
-    // Scene Nodes
-    private var barbecueGrill: SKSpriteNode!
+    private var grillBackground: SKSpriteNode!
+    private var grillForeground: SKSpriteNode!
 
     override func didMove(to view: SKView) {
         backgroundColor = SKColor(red: 0.87, green: 0.94, blue: 1.0, alpha: 1.0)
         
-        // Set up physics world and contact delegate
         physicsWorld.gravity = CGVector(dx: 0, dy: fallingSpeed)
         physicsWorld.contactDelegate = self
         
-        // Top, left, right boundaries (no bottom)
         let borderPath = CGMutablePath()
         borderPath.move(to: CGPoint(x: 0, y: 0))
         borderPath.addLine(to: CGPoint(x: 0, y: frame.height))
@@ -82,13 +74,18 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     // MARK: - Setup Methods
     
     private func setupUI() {
+        // Determine the top safe area inset to avoid the notch.
+        // We'll use a default padding of 20 if the safe area is not available.
+        let topPadding = self.view?.safeAreaInsets.top ?? 20.0
+        
         scoreLabel = SKLabelNode(text: "Score: \(score)")
         scoreLabel.fontName = "Helvetica-Bold"
         scoreLabel.fontSize = 24
         scoreLabel.fontColor = .black
         scoreLabel.horizontalAlignmentMode = .right
         scoreLabel.verticalAlignmentMode = .top
-        scoreLabel.position = CGPoint(x: size.width - 20, y: size.height - 20)
+        // Position the label relative to the safe area, not the screen edge.
+        scoreLabel.position = CGPoint(x: size.width - 20, y: size.height - topPadding)
         addChild(scoreLabel)
         
         progressLabel = SKLabelNode(text: updateProgressText())
@@ -97,21 +94,22 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         progressLabel.fontColor = .darkGray
         progressLabel.horizontalAlignmentMode = .left
         progressLabel.verticalAlignmentMode = .top
-        progressLabel.position = CGPoint(x: 20, y: size.height - 20)
+        // Position the label relative to the safe area as well.
+        progressLabel.position = CGPoint(x: 20, y: size.height - topPadding)
         addChild(progressLabel)
     }
 
     private func setupBarbecueGrill() {
         let grillSize = CGSize(width: size.width * 0.9, height: size.height * 0.2)
-        let grillFrames = BarbecueGrillGenerator.shared.generateGrillAnimationFrames(size: grillSize, frameCount: 4)
         
-        barbecueGrill = SKSpriteNode(texture: grillFrames.first)
-        barbecueGrill.size = grillSize
-        barbecueGrill.position = CGPoint(x: size.width / 2, y: grillSize.height / 2)
-        // Render the grill IN FRONT of the pigs (who are at zPosition 0)
-        barbecueGrill.zPosition = 1
+        let (backgroundFrames, foregroundFrames) = BarbecueGrillGenerator.shared.generateLayeredAnimationFrames(size: grillSize, frameCount: 4)
         
-        // Lowered and precise flame hitbox
+        grillBackground = SKSpriteNode(texture: backgroundFrames.first)
+        grillBackground.size = grillSize
+        grillBackground.position = CGPoint(x: size.width / 2, y: grillSize.height / 2)
+        grillBackground.zPosition = -1
+        grillBackground.name = "grill"
+        
         let flameAreaHeight: CGFloat = 20.0
         let flameAreaSize = CGSize(width: grillSize.width * 0.9, height: flameAreaHeight)
         let centerY = (grillSize.height * -0.07) + (flameAreaHeight / 2)
@@ -119,18 +117,26 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         flameBody.isDynamic = false
         flameBody.categoryBitMask = PhysicsCategory.flame
-        flameBody.contactTestBitMask = PhysicsCategory.pig // Test contact with pigs
-        flameBody.collisionBitMask = PhysicsCategory.none // Doesn't physically collide
+        flameBody.contactTestBitMask = PhysicsCategory.pig
+        flameBody.collisionBitMask = PhysicsCategory.none
+        grillBackground.physicsBody = flameBody
         
-        barbecueGrill.physicsBody = flameBody
+        addChild(grillBackground)
         
-        addChild(barbecueGrill)
+        grillForeground = SKSpriteNode(texture: foregroundFrames.first)
+        grillForeground.size = grillSize
+        grillForeground.position = grillBackground.position
+        grillForeground.zPosition = 1
+        grillForeground.name = "grill"
         
-        let flickerAnimation = SKAction.animate(with: grillFrames, timePerFrame: 0.15)
-        barbecueGrill.run(SKAction.repeatForever(flickerAnimation))
+        addChild(grillForeground)
+        
+        let backgroundAnimation = SKAction.animate(with: backgroundFrames, timePerFrame: 0.15)
+        let foregroundAnimation = SKAction.animate(with: foregroundFrames, timePerFrame: 0.15)
+        
+        grillBackground.run(SKAction.repeatForever(backgroundAnimation))
+        grillForeground.run(SKAction.repeatForever(foregroundAnimation))
     }
-    
-    // MARK: - Game Logic
     
     private func startNextRound() {
         nextRoundScheduled = true
@@ -157,6 +163,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         let pigTexture = PigTextureGenerator.shared.generatePigTexture(for: letter, size: pigSize)
         let pigSprite = SKSpriteNode(texture: pigTexture)
         pigSprite.size = pigSize
+        pigSprite.zPosition = 0 // Positioned between grill layers
         
         let radius = pigSize.width / 2
         pigSprite.position = CGPoint(x: CGFloat.random(in: radius...(size.width - radius)), y: size.height - radius - 10)
@@ -172,16 +179,23 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         body.restitution = 0.4
         body.linearDamping = 0.3
         body.angularDamping = 0.8
-        body.velocity = CGVector(dx: CGFloat.random(in: -15...15), dy: CGFloat.random(in: -40 ... -15))
+        // Set horizontal velocity (dx) to 0 as you suggested.
+        body.velocity = CGVector(dx: 0, dy: CGFloat.random(in: -40 ... -15))
         body.angularVelocity = CGFloat.random(in: -0.5...0.5)
         
-        // --- Set up pig physics for contact detection ---
         body.categoryBitMask = PhysicsCategory.pig
-        body.contactTestBitMask = PhysicsCategory.flame // Important!
-        body.collisionBitMask = 0xFFFFFFFF // Collide with everything else
+        body.contactTestBitMask = PhysicsCategory.flame
+        body.collisionBitMask = 0xFFFFFFFF
         
         pigSprite.physicsBody = body
         addChild(pigSprite)
+        
+        // After a short delay, enable contact tests with the flame.
+        let wait = SKAction.wait(forDuration: 0.5)
+        let enableContact = SKAction.run {
+            pigSprite.physicsBody?.contactTestBitMask = PhysicsCategory.flame
+        }
+        pigSprite.run(SKAction.sequence([wait, enableContact]))
     }
     
     // MARK: - Physics Contact Delegate
@@ -198,7 +212,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             secondBody = contact.bodyA
         }
         
-        // Check for pig and flame contact
         if (firstBody.categoryBitMask & PhysicsCategory.pig != 0) &&
            (secondBody.categoryBitMask & PhysicsCategory.flame != 0) {
             if let pigNode = firstBody.node as? SKSpriteNode {
@@ -208,16 +221,12 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     }
     
     private func handlePigFlameContact(pigNode: SKSpriteNode) {
-        // Prevent multiple calls and the spawn-smoke bug
         guard pigNode.parent != nil, pigNode.position.y < (size.height * 0.8) else { return }
         
-        // Remove physics body to stop further interactions
         pigNode.physicsBody = nil
         
-        // Create a puff of smoke
         createPuffOfSmoke(at: pigNode.position)
         
-        // Remove the pig
         pigNode.removeFromParent()
     }
 
@@ -226,10 +235,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         smokeEmitter.particleTexture = ParticleTextureGenerator.shared.getSmokeTexture()
         smokeEmitter.particlePosition = position
         
-        // More pronounced smoke effect
         smokeEmitter.particleSize = CGSize(width: 80, height: 80)
-        // Change smoke color to white
-        smokeEmitter.particleColor = .white
+        smokeEmitter.particleColor = .lightGray
         smokeEmitter.particleColorBlendFactor = 1.0
         smokeEmitter.particleAlpha = 0.9
         smokeEmitter.particleAlphaSpeed = -0.6
@@ -242,21 +249,28 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         addChild(smokeEmitter)
         
-        // Clean up the emitter after it's done
         let removeAction = SKAction.sequence([
-            SKAction.wait(forDuration: 1.5),
+            SKAction.wait(forDuration: 2.5),
             SKAction.removeFromParent()
         ])
         smokeEmitter.run(removeAction)
     }
 
-    // MARK: - Touches and Input Handling
-    
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         if isGameOver {
             restartGame()
             return
         }
+
+        for touch in touches {
+            let location = touch.location(in: self)
+            let touchedNode = atPoint(location)
+            if touchedNode.name == "grill" {
+                NotificationCenter.default.post(name: .pauseGame, object: nil)
+                return
+            }
+        }
+
         handleTouches(touches)
     }
 
@@ -283,8 +297,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
                     pigSprite.userData?["isBeingRemoved"] = true
                     selectedOrder.append(tappedLetter)
                     
-                    // --- FIX: Immediately disable physics on correct taps ---
-                    // This prevents the pig from triggering a flame collision while it's fading out.
                     pigSprite.physicsBody = nil
                     
                     let disappearAction = SKAction.group([.scale(to: 0.1, duration: 0.3), .fadeOut(withDuration: 0.3)])
@@ -310,17 +322,13 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         run(SKAction.sequence([.wait(forDuration: penaltyDuration + 0.3), .run { [weak self] in self?.isPenaltyActive = false }]))
     }
 
-    // MARK: - Game State and Update Loop
-    
     override func update(_ currentTime: TimeInterval) {
-        // Clean up any balls that fell off screen (as a fallback)
         children.forEach { node in
             if node.name == "ball" && node.position.y < -ballRadius {
                 node.removeFromParent()
             }
         }
         
-        // Check for round completion
         if !nextRoundScheduled && children.first(where: { $0.name == "ball" }) == nil {
             evaluateRound()
         }
@@ -339,7 +347,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
         
         if correctInSequence > 0 {
-            failedRoundsCounter = 0 // Reset on any correct tap
+            failedRoundsCounter = 0
             updateScore(correctCount: correctInSequence)
         } else {
             perfectRoundStreak = 0
@@ -453,8 +461,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         overlay.alpha = 0
         overlay.run(SKAction.fadeAlpha(to: 0.7, duration: 0.5))
     }
-    
-    // MARK: - Helper Methods
     
     private func updateFailureDisplay() {
         failureIndicatorNodes.forEach { $0.removeFromParent() }

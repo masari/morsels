@@ -6,39 +6,52 @@ class BarbecueGrillGenerator {
     
     private init() {}
     
-    private var animationCache: [String: [SKTexture]] = [:]
-    
-    func generateGrillAnimationFrames(size: CGSize, frameCount: Int = 4) -> [SKTexture] {
-        let cacheKey = "grill_anim_\(Int(size.width))x\(Int(size.height))"
+    private var animationCache: [String: (background: [SKTexture], foreground: [SKTexture])] = [:]
+
+    func generateLayeredAnimationFrames(size: CGSize, frameCount: Int = 4) -> (background: [SKTexture], foreground: [SKTexture]) {
+        let cacheKey = "grill_layered_anim_\(Int(size.width))x\(Int(size.height))"
         if let cachedFrames = animationCache[cacheKey] {
             return cachedFrames
         }
-        
-        var frames: [SKTexture] = []
+
+        var backgroundFrames: [SKTexture] = []
+        var foregroundFrames: [SKTexture] = []
+
         for _ in 0..<frameCount {
-            let texture = createGrillTexture(size: size, isAnimated: true)
-            frames.append(texture)
+            let (bgTexture, fgTexture) = createLayeredGrillTexture(size: size, isAnimated: true)
+            backgroundFrames.append(bgTexture)
+            foregroundFrames.append(fgTexture)
         }
-        
-        animationCache[cacheKey] = frames
-        return frames
+
+        let result = (background: backgroundFrames, foreground: foregroundFrames)
+        animationCache[cacheKey] = result
+        return result
     }
-    
-    private func createGrillTexture(size: CGSize, isAnimated: Bool) -> SKTexture {
+
+    private func createLayeredGrillTexture(size: CGSize, isAnimated: Bool) -> (background: SKTexture, foreground: SKTexture) {
         let renderer = UIGraphicsImageRenderer(size: size)
-        let image = renderer.image { context in
+
+        let backgroundImage = renderer.image { context in
             let ctx = context.cgContext
-            
             ctx.translateBy(x: 0, y: size.height)
             ctx.scaleBy(x: 1.0, y: -1.0)
             
             drawBrickBase(ctx: ctx, size: size)
             drawGrillTop(ctx: ctx, size: size)
-            drawWallOfFire(ctx: ctx, size: size, isAnimated: isAnimated)
+            drawWallOfFire(ctx: ctx, size: size, isAnimated: isAnimated, layer: .background)
         }
-        return SKTexture(image: image)
+
+        let foregroundImage = renderer.image { context in
+            let ctx = context.cgContext
+            ctx.translateBy(x: 0, y: size.height)
+            ctx.scaleBy(x: 1.0, y: -1.0)
+            
+            drawWallOfFire(ctx: ctx, size: size, isAnimated: isAnimated, layer: .foreground)
+        }
+
+        return (background: SKTexture(image: backgroundImage), foreground: SKTexture(image: foregroundImage))
     }
-    
+
     private func drawBrickBase(ctx: CGContext, size: CGSize) {
         let brickRect = CGRect(x: 0, y: 0, width: size.width, height: size.height * 0.4)
         let colors = [
@@ -92,24 +105,25 @@ class BarbecueGrillGenerator {
         ctx.stroke(grateRect)
     }
     
-    private func drawWallOfFire(ctx: CGContext, size: CGSize, isAnimated: Bool) {
-        let flameBaseY = size.height * 0.30 // Lowered flame origin
-        let flameHeight = size.height * 0.65 // Adjusted height
+    private enum FlameLayer { case background, foreground }
+    
+    private func drawWallOfFire(ctx: CGContext, size: CGSize, isAnimated: Bool, layer: FlameLayer) {
+        let flameBaseY = size.height * 0.30
+        let flameHeight = size.height * 0.65
 
         let flames = [
-            FlameConfig(x: 0.25, width: 0.3, heightRatio: 0.9, color: UIColor(red: 0.9, green: 0.3, blue: 0.0, alpha: 0.8)),
-            FlameConfig(x: 0.5, width: 0.4, heightRatio: 1.0, color: UIColor(red: 0.9, green: 0.35, blue: 0.0, alpha: 0.85)),
-            FlameConfig(x: 0.75, width: 0.3, heightRatio: 0.9, color: UIColor(red: 0.9, green: 0.3, blue: 0.0, alpha: 0.8)),
-            FlameConfig(x: 0.15, width: 0.25, heightRatio: 0.8, color: UIColor(red: 1.0, green: 0.5, blue: 0.1, alpha: 0.9)),
-            FlameConfig(x: 0.4, width: 0.3, heightRatio: 0.9, color: UIColor(red: 1.0, green: 0.5, blue: 0.1, alpha: 0.95)),
-            FlameConfig(x: 0.6, width: 0.3, heightRatio: 0.85, color: UIColor(red: 1.0, green: 0.5, blue: 0.1, alpha: 0.92)),
-            FlameConfig(x: 0.85, width: 0.25, heightRatio: 0.8, color: UIColor(red: 1.0, green: 0.5, blue: 0.1, alpha: 0.9)),
-            FlameConfig(x: 0.2, width: 0.15, heightRatio: 0.6, color: UIColor(red: 1.0, green: 0.75, blue: 0.2, alpha: 1.0)),
-            FlameConfig(x: 0.5, width: 0.2, heightRatio: 0.7, color: UIColor(red: 1.0, green: 0.8, blue: 0.2, alpha: 1.0)),
-            FlameConfig(x: 0.8, width: 0.15, heightRatio: 0.65, color: UIColor(red: 1.0, green: 0.75, blue: 0.2, alpha: 1.0)),
+            FlameConfig(x: 0.5, width: 0.4, heightRatio: 1.0, color: UIColor(red: 0.9, green: 0.35, blue: 0.0, alpha: 0.85), layer: .background),
+            FlameConfig(x: 0.15, width: 0.25, heightRatio: 0.8, color: UIColor(red: 1.0, green: 0.5, blue: 0.1, alpha: 0.9), layer: .background),
+            FlameConfig(x: 0.85, width: 0.25, heightRatio: 0.8, color: UIColor(red: 1.0, green: 0.5, blue: 0.1, alpha: 0.9), layer: .background),
+            FlameConfig(x: 0.5, width: 0.2, heightRatio: 0.7, color: UIColor(red: 1.0, green: 0.8, blue: 0.2, alpha: 1.0), layer: .background),
+            
+            FlameConfig(x: 0.3, width: 0.3, heightRatio: 0.9, color: UIColor(red: 0.9, green: 0.3, blue: 0.0, alpha: 0.8), layer: .foreground),
+            FlameConfig(x: 0.7, width: 0.3, heightRatio: 0.9, color: UIColor(red: 0.9, green: 0.3, blue: 0.0, alpha: 0.8), layer: .foreground),
+            FlameConfig(x: 0.35, width: 0.2, heightRatio: 0.65, color: UIColor(red: 1.0, green: 0.75, blue: 0.2, alpha: 1.0), layer: .foreground),
+            FlameConfig(x: 0.65, width: 0.2, heightRatio: 0.65, color: UIColor(red: 1.0, green: 0.75, blue: 0.2, alpha: 1.0), layer: .foreground),
         ]
         
-        for flame in flames {
+        for flame in flames where flame.layer == layer {
             let heightFlicker = isAnimated ? 1.0 + CGFloat.random(in: -0.2...0.2) : 1.0
             let widthFlicker = isAnimated ? 1.0 + CGFloat.random(in: -0.15...0.15) : 1.0
             let xFlicker = isAnimated ? CGFloat.random(in: -8...8) : 0
@@ -126,6 +140,7 @@ class BarbecueGrillGenerator {
     private struct FlameConfig {
         let x, width, heightRatio: CGFloat
         let color: UIColor
+        let layer: FlameLayer
     }
     
     private func drawOrganicFlame(ctx: CGContext, centerX: CGFloat, baseY: CGFloat, width: CGFloat, height: CGFloat, color: UIColor) {
