@@ -10,6 +10,14 @@ class GameScene: SKScene {
     private let penaltyDuration: TimeInterval = 1.0
     private var isPenaltyActive = false
     private let fallingSpeed: CGFloat = -0.4 // Configurable falling speed for pigs.
+    
+    // Game Over mechanics
+    private let maxFailedRounds = 3
+    private var failedRoundsCounter = 0
+    private var isGameOver = false
+    private let gameOverDelay: TimeInterval = 1.0 // A short pause before the Game Over screen.
+    private var failureIndicatorNodes: [SKLabelNode] = []
+    
     // Delay before playing Morse code for the next round
     private let nextRoundDelay: TimeInterval = 5.0
     
@@ -245,10 +253,15 @@ class GameScene: SKScene {
 
     // Handle taps and swipes
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if isGameOver {
+            restartGame()
+            return
+        }
         handleTouches(touches)
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard !isGameOver else { return }
         handleTouches(touches)
     }
 
@@ -265,16 +278,12 @@ class GameScene: SKScene {
                 guard let pigSprite = pigNode as? SKSpriteNode,
                       let letterString = pigSprite.userData?["letter"] as? String,
                       let tappedLetter = letterString.first,
-                      // Add a check to ensure the pig is not already being removed.
                       pigSprite.userData?["isBeingRemoved"] as? Bool != true
                 else { continue }
                 
                 if selectedOrder.count < roundLetters.count && tappedLetter == roundLetters[selectedOrder.count] {
                     // Correct tap
-                    
-                    // Mark the pig so it cannot be tapped again during its animation.
                     pigSprite.userData?["isBeingRemoved"] = true
-                    
                     selectedOrder.append(tappedLetter)
                     
                     let disappearAction = SKAction.group([
@@ -293,27 +302,19 @@ class GameScene: SKScene {
     }
     
     private func triggerPenalty() {
-        // 1. Set the penalty state to active to block input.
         isPenaltyActive = true
-        perfectRoundStreak = 0 // An incorrect tap always resets the streak.
+        perfectRoundStreak = 0
 
-        // 2. Apply the visual penalty to all pigs.
         let remainingPigs = children.filter { $0.name == "ball" }
         let turnBlue = SKAction.colorize(with: .systemBlue, colorBlendFactor: 0.9, duration: 0.1)
-        let wait = SKAction.wait(forDuration: penaltyDuration)
         let restoreColor = SKAction.colorize(withColorBlendFactor: 0.0, duration: 0.2)
+        let wait = SKAction.wait(forDuration: penaltyDuration)
         
-        // Create the visual sequence for each pig.
         let penaltySequence = SKAction.sequence([turnBlue, wait, restoreColor])
-        remainingPigs.forEach { pig in
-            // Use a unique key for each pig's penalty animation to prevent conflicts.
-            pig.run(penaltySequence, withKey: "penalty_\(pig.hash)")
-        }
+        remainingPigs.forEach { $0.run(penaltySequence, withKey: "penalty_\($0.hash)") }
 
-        // 3. Set a separate, reliable timer on the scene itself to end the penalty state.
-        // This is decoupled from the pig animations and is guaranteed to run.
         let endPenaltySequence = SKAction.sequence([
-            .wait(forDuration: penaltyDuration + 0.3), // Wait slightly longer than the visual effect
+            .wait(forDuration: penaltyDuration + 0.3),
             .run { [weak self] in
                 self?.isPenaltyActive = false
             }
@@ -321,9 +322,108 @@ class GameScene: SKScene {
         run(endPenaltySequence)
     }
 
-    // Create sparkle effect for pig selection
-    private func createSparkleEffect(at position: CGPoint) {
-        // Implementation for creating a sparkle effect at a given position
+    private func updateFailureDisplay() {
+        // Clear previous indicators.
+        failureIndicatorNodes.forEach { $0.removeFromParent() }
+        failureIndicatorNodes.removeAll()
+
+        guard failedRoundsCounter > 0 else { return }
+
+        // Create a template to measure the size of the emoji.
+        let hamLabelTemplate = SKLabelNode(text: "🍖")
+        hamLabelTemplate.fontSize = 30
+        let hamWidth = hamLabelTemplate.frame.width
+        let spacing: CGFloat = 5
+        
+        // 1. Calculate the total width required for ALL possible hams (maxFailedRounds).
+        let maxHams = maxFailedRounds
+        let totalPossibleWidth = (CGFloat(maxHams) * hamWidth) + (CGFloat(max(0, maxHams - 1)) * spacing)
+        
+        // 2. Determine the starting X position for the first (leftmost) ham in this pre-allocated space.
+        let startX = (size.width - 20) - totalPossibleWidth
+
+        // 3. Create and place the ham emojis from left to right within this space.
+        for i in 0..<failedRoundsCounter {
+            let hamLabel = SKLabelNode(text: "🍖")
+            hamLabel.fontSize = 30
+            
+            // Position each ham sequentially from the start position. They will not move once placed.
+            let xPos = startX + (hamWidth / 2) + (CGFloat(i) * (hamWidth + spacing))
+            let yPos = scoreLabel.position.y - scoreLabel.frame.height - 20
+            hamLabel.position = CGPoint(x: xPos, y: yPos)
+            
+            addChild(hamLabel)
+            failureIndicatorNodes.append(hamLabel)
+        }
+    }
+
+    private func showGameOver() {
+        isGameOver = true
+        
+        removeAllActions()
+
+        let overlay = SKShapeNode(rectOf: size)
+        overlay.fillColor = .black
+        overlay.alpha = 0.0
+        overlay.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        overlay.zPosition = 10
+        overlay.name = "gameOverOverlay"
+        addChild(overlay)
+
+        let gameOverLabel = SKLabelNode(text: "Game Over")
+        gameOverLabel.fontName = "Helvetica-Bold"
+        gameOverLabel.fontSize = 48
+        gameOverLabel.fontColor = .white
+        gameOverLabel.position = CGPoint(x: size.width / 2, y: size.height * 0.6)
+        gameOverLabel.alpha = 0.0
+        gameOverLabel.zPosition = 11
+        gameOverLabel.name = "gameOverLabel"
+        addChild(gameOverLabel)
+        
+        let finalScoreLabel = SKLabelNode(text: "Final Score: \(score)")
+        finalScoreLabel.fontName = "Helvetica"
+        finalScoreLabel.fontSize = 24
+        finalScoreLabel.fontColor = .white
+        finalScoreLabel.position = CGPoint(x: size.width / 2, y: size.height * 0.5)
+        finalScoreLabel.alpha = 0.0
+        finalScoreLabel.zPosition = 11
+        finalScoreLabel.name = "gameOverLabel"
+        addChild(finalScoreLabel)
+        
+        let restartLabel = SKLabelNode(text: "Tap to Restart")
+        restartLabel.fontName = "Helvetica"
+        restartLabel.fontSize = 20
+        restartLabel.fontColor = .white
+        restartLabel.position = CGPoint(x: size.width / 2, y: size.height * 0.4)
+        restartLabel.alpha = 0.0
+        restartLabel.zPosition = 11
+        restartLabel.name = "gameOverLabel"
+        addChild(restartLabel)
+
+        let fadeIn = SKAction.fadeIn(withDuration: 0.5)
+        let fadeOverlay = SKAction.fadeAlpha(to: 0.7, duration: 0.5)
+        overlay.run(fadeOverlay)
+        gameOverLabel.run(fadeIn)
+        finalScoreLabel.run(fadeIn)
+        restartLabel.run(fadeIn)
+    }
+
+    private func restartGame() {
+        children.filter { $0.name == "gameOverOverlay" || $0.name == "gameOverLabel" }.forEach { $0.removeFromParent() }
+
+        isGameOver = false
+        score = 0
+        failedRoundsCounter = 0
+        updateFailureDisplay() // Clear the emojis from the screen.
+        perfectRoundStreak = 0
+        selectedOrder.removeAll()
+        
+        initializeLearningStats()
+        
+        scoreLabel.text = "Score: \(score)"
+        progressLabel.text = updateProgressText()
+        
+        startNextRound()
     }
 
     override func update(_ currentTime: TimeInterval) {
@@ -349,6 +449,7 @@ class GameScene: SKScene {
             }
             
             if correctInSequence > 0 {
+                failedRoundsCounter = 0
                 let sequencePoints = correctInSequence * pointsPerCorrectLetter
                 var totalPointsEarned = sequencePoints
                 var isComplete = false
@@ -381,6 +482,24 @@ class GameScene: SKScene {
                 scoreLabel.run(flashAction)
             } else {
                 perfectRoundStreak = 0
+                failedRoundsCounter += 1
+            }
+            
+            // If the player got at least one correct, reset the failure counter.
+            if correctInSequence > 0 {
+                failedRoundsCounter = 0
+            }
+            
+            // Update the visual display of hams.
+            updateFailureDisplay()
+
+            // Check if the game is over AFTER updating the display.
+            if failedRoundsCounter >= maxFailedRounds {
+                nextRoundScheduled = true // Stop the game loop.
+                let wait = SKAction.wait(forDuration: gameOverDelay)
+                let show = SKAction.run { [weak self] in self?.showGameOver() }
+                run(SKAction.sequence([wait, show]))
+                return
             }
             
             checkForAdvancement()
