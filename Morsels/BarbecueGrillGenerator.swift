@@ -8,6 +8,7 @@ class BarbecueGrillGenerator {
     
     private var animationCache: [String: (background: [SKTexture], foreground: [SKTexture])] = [:]
 
+    // New public method to generate layered animation frames
     func generateLayeredAnimationFrames(size: CGSize, frameCount: Int = 4) -> (background: [SKTexture], foreground: [SKTexture]) {
         let cacheKey = "grill_layered_anim_\(Int(size.width))x\(Int(size.height))"
         if let cachedFrames = animationCache[cacheKey] {
@@ -28,9 +29,11 @@ class BarbecueGrillGenerator {
         return result
     }
 
+    // Creates a pair of textures for a single animation frame
     private func createLayeredGrillTexture(size: CGSize, isAnimated: Bool) -> (background: SKTexture, foreground: SKTexture) {
         let renderer = UIGraphicsImageRenderer(size: size)
 
+        // --- Create Background Texture ---
         let backgroundImage = renderer.image { context in
             let ctx = context.cgContext
             ctx.translateBy(x: 0, y: size.height)
@@ -38,14 +41,17 @@ class BarbecueGrillGenerator {
             
             drawBrickBase(ctx: ctx, size: size)
             drawGrillTop(ctx: ctx, size: size)
+            // Draw only the background flames
             drawWallOfFire(ctx: ctx, size: size, isAnimated: isAnimated, layer: .background)
         }
 
+        // --- Create Foreground Texture (Transparent) ---
         let foregroundImage = renderer.image { context in
             let ctx = context.cgContext
             ctx.translateBy(x: 0, y: size.height)
             ctx.scaleBy(x: 1.0, y: -1.0)
             
+            // Draw only the foreground flames
             drawWallOfFire(ctx: ctx, size: size, isAnimated: isAnimated, layer: .foreground)
         }
 
@@ -111,18 +117,22 @@ class BarbecueGrillGenerator {
         let flameBaseY = size.height * 0.30
         let flameHeight = size.height * 0.65
 
+        // Define all flames and assign them to a layer
         let flames = [
+            // Background Flames
             FlameConfig(x: 0.5, width: 0.4, heightRatio: 1.0, color: UIColor(red: 0.9, green: 0.35, blue: 0.0, alpha: 0.85), layer: .background),
             FlameConfig(x: 0.15, width: 0.25, heightRatio: 0.8, color: UIColor(red: 1.0, green: 0.5, blue: 0.1, alpha: 0.9), layer: .background),
             FlameConfig(x: 0.85, width: 0.25, heightRatio: 0.8, color: UIColor(red: 1.0, green: 0.5, blue: 0.1, alpha: 0.9), layer: .background),
             FlameConfig(x: 0.5, width: 0.2, heightRatio: 0.7, color: UIColor(red: 1.0, green: 0.8, blue: 0.2, alpha: 1.0), layer: .background),
             
+            // Foreground Flames
             FlameConfig(x: 0.3, width: 0.3, heightRatio: 0.9, color: UIColor(red: 0.9, green: 0.3, blue: 0.0, alpha: 0.8), layer: .foreground),
             FlameConfig(x: 0.7, width: 0.3, heightRatio: 0.9, color: UIColor(red: 0.9, green: 0.3, blue: 0.0, alpha: 0.8), layer: .foreground),
             FlameConfig(x: 0.35, width: 0.2, heightRatio: 0.65, color: UIColor(red: 1.0, green: 0.75, blue: 0.2, alpha: 1.0), layer: .foreground),
             FlameConfig(x: 0.65, width: 0.2, heightRatio: 0.65, color: UIColor(red: 1.0, green: 0.75, blue: 0.2, alpha: 1.0), layer: .foreground),
         ]
         
+        // Filter and draw only the flames for the specified layer
         for flame in flames where flame.layer == layer {
             let heightFlicker = isAnimated ? 1.0 + CGFloat.random(in: -0.2...0.2) : 1.0
             let widthFlicker = isAnimated ? 1.0 + CGFloat.random(in: -0.15...0.15) : 1.0
@@ -150,18 +160,20 @@ class BarbecueGrillGenerator {
         let peakPoint = CGPoint(x: centerX, y: baseY + height)
         let leftBasePoint = CGPoint(x: centerX - width / 2, y: baseY)
         let rightBasePoint = CGPoint(x: centerX + width / 2, y: baseY)
-        
-        let peakControlOffset = width * 0.2
+
+        // Lower the control points slightly from the peak to create a gentle curve
+        let peakYControl = peakPoint.y - height * 0.2
+        let peakControlOffset = width * 0.3
 
         path.move(to: leftBasePoint)
         
         path.addCurve(to: peakPoint,
-                      control1: CGPoint(x: centerX - width * 0.4, y: baseY + height * 0.4),
-                      control2: CGPoint(x: peakPoint.x - peakControlOffset, y: peakPoint.y))
+                      control1: CGPoint(x: centerX - width * 0.4, y: baseY + height * 0.25),
+                      control2: CGPoint(x: peakPoint.x - peakControlOffset, y: peakYControl))
         
         path.addCurve(to: rightBasePoint,
-                      control1: CGPoint(x: peakPoint.x + peakControlOffset, y: peakPoint.y),
-                      control2: CGPoint(x: centerX + width * 0.4, y: baseY + height * 0.4))
+                      control1: CGPoint(x: peakPoint.x + peakControlOffset, y: peakYControl),
+                      control2: CGPoint(x: centerX + width * 0.4, y: baseY + height * 0.25))
 
         path.closeSubpath()
         ctx.addPath(path)

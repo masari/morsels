@@ -1,25 +1,20 @@
+//
+//  AppDelegate.swift
+//  Morsels
+//
+//  Created by Mark Messer on 9/27/25.
+//
+
 import UIKit
-import SwiftUI
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
 
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-
-        // --- SwiftUI Launch ---
-        // 1. Create a UIWindow.
-        let window = UIWindow(frame: UIScreen.main.bounds)
-
-        // 2. Set the root view controller with our ContentView.
-        // UIHostingController is the bridge that allows SwiftUI views to be used in a UIKit app lifecycle.
-        window.rootViewController = UIHostingController(rootView: ContentView())
-
-        // 3. Make the window visible.
-        self.window = window
-        window.makeKeyAndVisible()
-
+        // Override point for customization after application launch.
         return true
     }
 
@@ -39,4 +34,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func applicationDidBecomeActive(_ application: UIApplication) {
         // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
     }
+
+
 }
+

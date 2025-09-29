@@ -1,10 +1,11 @@
 import SpriteKit
 import GameplayKit
 
+// MARK: - Physics Categories
 struct PhysicsCategory {
     static let none: UInt32 = 0
-    static let pig: UInt32 = 0b1
-    static let flame: UInt32 = 0b10
+    static let pig: UInt32 = 0b1 // 1
+    static let flame: UInt32 = 0b10 // 2
 }
 
 class GameScene: SKScene, SKPhysicsContactDelegate {
@@ -16,14 +17,17 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private var isPenaltyActive = false
     private let fallingSpeed: CGFloat = -0.4
     
+    // Game Over
     private let maxFailedRounds = 3
     private var failedRoundsCounter = 0
     private var isGameOver = false
     private let gameOverDelay: TimeInterval = 1.0
     private var failureIndicatorNodes: [SKLabelNode] = []
     
+    // Round Timing
     private let nextRoundDelay: TimeInterval = 5.0
     
+    // Scoring
     private var score: Int = 0
     private var scoreLabel: SKLabelNode!
     private var selectedOrder: [Character] = []
@@ -31,10 +35,12 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private let completionBonusPerBall: Int = 50
     private let minBallsForBonus: Int = 3
     
+    // Streak Bonus
     private let streakBonusPoints: Int = 25
     private let streakBonusInterval: Int = 3
     private var perfectRoundStreak: Int = 0
     
+    // Learning System
     private let letterProgression: [Character] = ["E", "T", "I", "A", "N", "M", "S", "U", "R", "W", "D", "K", "G", "O", "H", "V", "F", "L", "P", "J", "B", "X", "C", "Y", "Z", "Q"]
     private var currentLearningStage: Int = 0
     private var letterStats: [Character: (correct: Int, total: Int)] = [:]
@@ -42,10 +48,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private let minAccuracyForAdvancement: Double = 0.8
     private var progressLabel: SKLabelNode!
 
-    // Scene Nodes
+    // Scene Nodes - Now layered
     private var grillBackground: SKSpriteNode!
     private var grillForeground: SKSpriteNode!
-    private var pigpen: SKSpriteNode!
 
     override func didMove(to view: SKView) {
         backgroundColor = SKColor(red: 0.87, green: 0.94, blue: 1.0, alpha: 1.0)
@@ -63,7 +68,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
         setupBarbecueGrill()
         setupUI()
-        setupPigpen() // Add the pigpen to the scene
         
         initializeLearningStats()
         
@@ -77,15 +81,13 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     // MARK: - Setup Methods
     
     private func setupUI() {
-        let topPadding = self.view?.safeAreaInsets.top ?? 20.0
-        
         scoreLabel = SKLabelNode(text: "Score: \(score)")
         scoreLabel.fontName = "Helvetica-Bold"
         scoreLabel.fontSize = 24
         scoreLabel.fontColor = .black
         scoreLabel.horizontalAlignmentMode = .right
         scoreLabel.verticalAlignmentMode = .top
-        scoreLabel.position = CGPoint(x: size.width - 20, y: size.height - topPadding)
+        scoreLabel.position = CGPoint(x: size.width - 20, y: size.height - 20)
         addChild(scoreLabel)
         
         progressLabel = SKLabelNode(text: updateProgressText())
@@ -94,20 +96,21 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         progressLabel.fontColor = .darkGray
         progressLabel.horizontalAlignmentMode = .left
         progressLabel.verticalAlignmentMode = .top
-        progressLabel.position = CGPoint(x: 20, y: size.height - topPadding)
+        progressLabel.position = CGPoint(x: 20, y: size.height - 20)
         addChild(progressLabel)
     }
 
     private func setupBarbecueGrill() {
         let grillSize = CGSize(width: size.width * 0.9, height: size.height * 0.2)
         
+        // Generate the layered animation frames
         let (backgroundFrames, foregroundFrames) = BarbecueGrillGenerator.shared.generateLayeredAnimationFrames(size: grillSize, frameCount: 4)
         
+        // --- Setup Background Layer (with Physics) ---
         grillBackground = SKSpriteNode(texture: backgroundFrames.first)
         grillBackground.size = grillSize
         grillBackground.position = CGPoint(x: size.width / 2, y: grillSize.height / 2)
-        grillBackground.zPosition = -1
-        grillBackground.name = "grill"
+        grillBackground.zPosition = -1 // BEHIND pigs
         
         let flameAreaHeight: CGFloat = 20.0
         let flameAreaSize = CGSize(width: grillSize.width * 0.9, height: flameAreaHeight)
@@ -122,38 +125,20 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         addChild(grillBackground)
         
+        // --- Setup Foreground Layer (Visual Only) ---
         grillForeground = SKSpriteNode(texture: foregroundFrames.first)
         grillForeground.size = grillSize
         grillForeground.position = grillBackground.position
-        grillForeground.zPosition = 1
-        grillForeground.name = "grill"
+        grillForeground.zPosition = 1 // IN FRONT of pigs
         
         addChild(grillForeground)
         
+        // --- Run Synchronized Animations ---
         let backgroundAnimation = SKAction.animate(with: backgroundFrames, timePerFrame: 0.15)
         let foregroundAnimation = SKAction.animate(with: foregroundFrames, timePerFrame: 0.15)
         
         grillBackground.run(SKAction.repeatForever(backgroundAnimation))
         grillForeground.run(SKAction.repeatForever(foregroundAnimation))
-    }
-    
-    private func setupPigpen() {
-        let topPadding = self.view?.safeAreaInsets.top ?? 20.0
-        let penSize = CGSize(width: size.width * 0.6, height: size.height * 0.15)
-        
-        let penTexture = PigpenGenerator.shared.generatePigpenTexture(size: penSize)
-        pigpen = SKSpriteNode(texture: penTexture)
-        pigpen.size = penSize
-        
-        // Position it below the top labels, adding more padding to show the hams.
-        let labelsBottomY = size.height - topPadding - progressLabel.frame.height
-        // Increased the padding from 10 to 50 to push the pigpen down.
-        pigpen.position = CGPoint(x: size.width / 2, y: labelsBottomY - (penSize.height / 2) - 50)
-        
-        // Place it deep in the background
-        pigpen.zPosition = -2
-        
-        addChild(pigpen)
     }
     
     // MARK: - Game Logic
@@ -183,7 +168,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         let pigTexture = PigTextureGenerator.shared.generatePigTexture(for: letter, size: pigSize)
         let pigSprite = SKSpriteNode(texture: pigTexture)
         pigSprite.size = pigSize
-        pigSprite.zPosition = 0
+        pigSprite.zPosition = 0 // Positioned between grill layers
         
         let radius = pigSize.width / 2
         pigSprite.position = CGPoint(x: CGFloat.random(in: radius...(size.width - radius)), y: size.height - radius - 10)
@@ -199,7 +184,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         body.restitution = 0.4
         body.linearDamping = 0.3
         body.angularDamping = 0.8
-        body.velocity = CGVector(dx: 0, dy: CGFloat.random(in: -40 ... -15))
+        body.velocity = CGVector(dx: CGFloat.random(in: -15...15), dy: CGFloat.random(in: -40 ... -15))
         body.angularVelocity = CGFloat.random(in: -0.5...0.5)
         
         body.categoryBitMask = PhysicsCategory.pig
@@ -247,20 +232,22 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         smokeEmitter.particleTexture = ParticleTextureGenerator.shared.getSmokeTexture()
         smokeEmitter.particlePosition = position
         
-        smokeEmitter.particleSize = CGSize(width: 80, height: 80)
-        smokeEmitter.particleColor = .lightGray
+        // --- Make Smoke More Pronounced ---
+        smokeEmitter.particleSize = CGSize(width: 100, height: 100) // Larger particles
+        smokeEmitter.particleColor = .darkGray // Darker for better contrast
         smokeEmitter.particleColorBlendFactor = 1.0
-        smokeEmitter.particleAlpha = 0.9
-        smokeEmitter.particleAlphaSpeed = -0.6
-        smokeEmitter.particleBirthRate = 300
-        smokeEmitter.particleLifetime = 2.0
-        smokeEmitter.particleScale = 0.1
-        smokeEmitter.particleScaleSpeed = 0.75
-        smokeEmitter.particleSpeed = 40
+        smokeEmitter.particleAlpha = 1.0 // Start fully opaque
+        smokeEmitter.particleAlphaSpeed = -0.4 // Fade out slower
+        smokeEmitter.particleBirthRate = 500 // More particles for a very dense cloud
+        smokeEmitter.particleLifetime = 2.5 // Linger on screen longer
+        smokeEmitter.particleScale = 0.05 // Start very small
+        smokeEmitter.particleScaleSpeed = 0.5 // Grow to create a "poof"
+        smokeEmitter.particleSpeed = 60 // Faster expansion
         smokeEmitter.emissionAngleRange = .pi * 2
         
         addChild(smokeEmitter)
         
+        // Clean up the emitter after it's done
         let removeAction = SKAction.sequence([
             SKAction.wait(forDuration: 2.5),
             SKAction.removeFromParent()
@@ -275,16 +262,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             restartGame()
             return
         }
-
-        for touch in touches {
-            let location = touch.location(in: self)
-            let touchedNode = atPoint(location)
-            if touchedNode.name == "grill" {
-                NotificationCenter.default.post(name: .pauseGame, object: nil)
-                return
-            }
-        }
-
         handleTouches(touches)
     }
 
@@ -313,15 +290,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
                     
                     pigSprite.physicsBody = nil
                     
-                    // --- NEW: "Fly to Pen" Animation ---
-                    let flyToPen = SKAction.move(to: pigpen.position, duration: 0.5)
-                    flyToPen.timingMode = .easeInEaseOut
-                    
-                    let scaleDown = SKAction.scale(to: 0.1, duration: 0.5)
-                    
-                    let savedAction = SKAction.group([flyToPen, scaleDown])
-                    pigSprite.run(SKAction.sequence([savedAction, .removeFromParent()]))
-                    
+                    let disappearAction = SKAction.group([.scale(to: 0.1, duration: 0.3), .fadeOut(withDuration: 0.3)])
+                    pigSprite.run(SKAction.sequence([disappearAction, .removeFromParent()]))
                 } else {
                     triggerPenalty()
                     return
@@ -504,8 +474,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             let hamLabel = SKLabelNode(text: "🍖")
             hamLabel.fontSize = 30
             let xPos = startX + (hamWidth / 2) + (CGFloat(i) * (hamWidth + spacing))
-            // Increased the vertical padding from 20 to 35 to lower the emoji.
-            let yPos = scoreLabel.position.y - scoreLabel.frame.height - 35
+            let yPos = scoreLabel.position.y - scoreLabel.frame.height - 20
             hamLabel.position = CGPoint(x: xPos, y: yPos)
             addChild(hamLabel)
             failureIndicatorNodes.append(hamLabel)
