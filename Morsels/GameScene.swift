@@ -1,69 +1,87 @@
 import SpriteKit
 import GameplayKit
 
-class GameScene: SKScene {
+// MARK: - Physics Categories
+struct PhysicsCategory {
+    static let none: UInt32 = 0
+    static let pig: UInt32 = 0b1 // 1
+    static let flame: UInt32 = 0b10 // 2
+}
 
-    private var ballRadius: CGFloat = 40.0  // Made mutable for device optimization
+class GameScene: SKScene, SKPhysicsContactDelegate {
+
+    private var ballRadius: CGFloat = 40.0
     private var roundLetters: [Character] = []
-    // Tracks whether we've already scheduled the next round
     private var nextRoundScheduled = false
     private let penaltyDuration: TimeInterval = 1.0
     private var isPenaltyActive = false
-    private let fallingSpeed: CGFloat = -0.4 // Configurable falling speed for pigs.
+    private let fallingSpeed: CGFloat = -0.4
     
-    // Game Over mechanics
+    // Game Over
     private let maxFailedRounds = 3
     private var failedRoundsCounter = 0
     private var isGameOver = false
-    private let gameOverDelay: TimeInterval = 1.0 // A short pause before the Game Over screen.
+    private let gameOverDelay: TimeInterval = 1.0
     private var failureIndicatorNodes: [SKLabelNode] = []
     
-    // Delay before playing Morse code for the next round
+    // Round Timing
     private let nextRoundDelay: TimeInterval = 5.0
     
-    // Scoring system
+    // Scoring
     private var score: Int = 0
     private var scoreLabel: SKLabelNode!
     private var selectedOrder: [Character] = []
-    
-    // Configurable scoring parameters
     private let pointsPerCorrectLetter: Int = 10
     private let completionBonusPerBall: Int = 50
     private let minBallsForBonus: Int = 3
     
-    // Streak bonus configuration
+    // Streak Bonus
     private let streakBonusPoints: Int = 25
-    private let streakBonusInterval: Int = 3  // Bonus every 3 perfect rounds
+    private let streakBonusInterval: Int = 3
     private var perfectRoundStreak: Int = 0
     
-    // Progressive learning system
+    // Learning System
     private let letterProgression: [Character] = ["E", "T", "I", "A", "N", "M", "S", "U", "R", "W", "D", "K", "G", "O", "H", "V", "F", "L", "P", "J", "B", "X", "C", "Y", "Z", "Q"]
     private var currentLearningStage: Int = 0
     private var letterStats: [Character: (correct: Int, total: Int)] = [:]
-    private let masteryThreshold: Int = 5  // Need 5 correct attempts to master a letter
-    private let minAccuracyForAdvancement: Double = 0.8  // 80% accuracy required
-    
-    // UI for learning progress
+    private let masteryThreshold: Int = 5
+    private let minAccuracyForAdvancement: Double = 0.8
     private var progressLabel: SKLabelNode!
 
+    // Scene Nodes
+    private var barbecueGrill: SKSpriteNode!
+
     override func didMove(to view: SKView) {
-        // Light sky blue background for better pig visibility
         backgroundColor = SKColor(red: 0.87, green: 0.94, blue: 1.0, alpha: 1.0)
-
-        // Gentle gravity
+        
+        // Set up physics world and contact delegate
         physicsWorld.gravity = CGVector(dx: 0, dy: fallingSpeed)
-
-        // Scene boundary only at left, right, and top edges (not bottom)
+        physicsWorld.contactDelegate = self
+        
+        // Top, left, right boundaries (no bottom)
         let borderPath = CGMutablePath()
         borderPath.move(to: CGPoint(x: 0, y: 0))
         borderPath.addLine(to: CGPoint(x: 0, y: frame.height))
         borderPath.addLine(to: CGPoint(x: frame.width, y: frame.height))
         borderPath.addLine(to: CGPoint(x: frame.width, y: 0))
-        
         physicsBody = SKPhysicsBody(edgeChainFrom: borderPath)
         physicsBody?.friction = 0.0
 
-        // Score label
+        setupBarbecueGrill()
+        setupUI()
+        
+        initializeLearningStats()
+        
+        let pigSize = PigTextureGenerator.shared.recommendedPigSize
+        ballRadius = pigSize.width / 2
+        
+        PigTextureGenerator.shared.preloadCommonLetters()
+        startNextRound()
+    }
+    
+    // MARK: - Setup Methods
+    
+    private func setupUI() {
         scoreLabel = SKLabelNode(text: "Score: \(score)")
         scoreLabel.fontName = "Helvetica-Bold"
         scoreLabel.fontSize = 24
@@ -73,7 +91,6 @@ class GameScene: SKScene {
         scoreLabel.position = CGPoint(x: size.width - 20, y: size.height - 20)
         addChild(scoreLabel)
         
-        // Progress label
         progressLabel = SKLabelNode(text: updateProgressText())
         progressLabel.fontName = "Helvetica"
         progressLabel.fontSize = 16
@@ -82,25 +99,42 @@ class GameScene: SKScene {
         progressLabel.verticalAlignmentMode = .top
         progressLabel.position = CGPoint(x: 20, y: size.height - 20)
         addChild(progressLabel)
-
-        // Initialize learning stats
-        initializeLearningStats()
-
-        // Set up pig size
-        let pigSize = PigTextureGenerator.shared.recommendedPigSize
-        ballRadius = pigSize.width / 2
-
-        // Preload textures
-        PigTextureGenerator.shared.preloadCommonLetters()
-        
-        // Start the first round
-        startNextRound()
     }
+
+    private func setupBarbecueGrill() {
+        let grillSize = CGSize(width: size.width * 0.9, height: size.height * 0.2)
+        let grillFrames = BarbecueGrillGenerator.shared.generateGrillAnimationFrames(size: grillSize, frameCount: 4)
+        
+        barbecueGrill = SKSpriteNode(texture: grillFrames.first)
+        barbecueGrill.size = grillSize
+        barbecueGrill.position = CGPoint(x: size.width / 2, y: grillSize.height / 2)
+        // Render the grill IN FRONT of the pigs (who are at zPosition 0)
+        barbecueGrill.zPosition = 1
+        
+        // Lowered and precise flame hitbox
+        let flameAreaHeight: CGFloat = 20.0
+        let flameAreaSize = CGSize(width: grillSize.width * 0.9, height: flameAreaHeight)
+        let centerY = (grillSize.height * -0.07) + (flameAreaHeight / 2)
+        let flameBody = SKPhysicsBody(rectangleOf: flameAreaSize, center: CGPoint(x: 0, y: centerY))
+        
+        flameBody.isDynamic = false
+        flameBody.categoryBitMask = PhysicsCategory.flame
+        flameBody.contactTestBitMask = PhysicsCategory.pig // Test contact with pigs
+        flameBody.collisionBitMask = PhysicsCategory.none // Doesn't physically collide
+        
+        barbecueGrill.physicsBody = flameBody
+        
+        addChild(barbecueGrill)
+        
+        let flickerAnimation = SKAction.animate(with: grillFrames, timePerFrame: 0.15)
+        barbecueGrill.run(SKAction.repeatForever(flickerAnimation))
+    }
+    
+    // MARK: - Game Logic
     
     private func startNextRound() {
         nextRoundScheduled = true
         selectedOrder.removeAll()
-        
         roundLetters = generateRoundLetters()
         
         let morseDuration = calculateMorseDuration(for: roundLetters)
@@ -117,104 +151,7 @@ class GameScene: SKScene {
         ])
         run(seq)
     }
-
-    // Initialize learning statistics
-    private func initializeLearningStats() {
-        currentLearningStage = min(2, letterProgression.count - 1)
-        for i in 0...currentLearningStage {
-            letterStats[letterProgression[i]] = (correct: 0, total: 0)
-        }
-    }
     
-    // Generate letters based on current learning stage
-    private func generateRoundLetters(allowDuplicates: Bool = false) -> [Character] {
-        let availableLetters = Array(letterProgression[0...currentLearningStage])
-        let count = Int.random(in: 1...min(4, availableLetters.count))
-        
-        if allowDuplicates {
-            return (0..<count).compactMap { _ in availableLetters.randomElement() }
-        } else {
-            var uniqueLetters = availableLetters
-            uniqueLetters.shuffle()
-            return Array(uniqueLetters.prefix(count))
-        }
-    }
-    
-    // Update progress text for display
-    private func updateProgressText() -> String {
-        let availableCount = currentLearningStage + 1
-        return "Learning: \(availableCount)/\(letterProgression.count) letters"
-    }
-    
-    // Check if ready to advance to next learning stage
-    private func checkForAdvancement() {
-        guard currentLearningStage < letterProgression.count - 1 else { return }
-        
-        var canAdvance = true
-        for i in 0...currentLearningStage {
-            let letter = letterProgression[i]
-            if let stats = letterStats[letter] {
-                let accuracy = stats.total > 0 ? Double(stats.correct) / Double(stats.total) : 0.0
-                if stats.correct < masteryThreshold || accuracy < minAccuracyForAdvancement {
-                    canAdvance = false
-                    break
-                }
-            } else {
-                canAdvance = false
-                break
-            }
-        }
-        
-        if canAdvance {
-            currentLearningStage += 1
-            let newLetter = letterProgression[currentLearningStage]
-            letterStats[newLetter] = (correct: 0, total: 0)
-            progressLabel.text = updateProgressText()
-            
-            let celebrateAction = SKAction.sequence([
-                .run { self.progressLabel.fontColor = .green },
-                .wait(forDuration: 1.0),
-                .run { self.progressLabel.fontColor = .darkGray }
-            ])
-            progressLabel.run(celebrateAction)
-        }
-    }
-    
-    // Update learning statistics
-    private func updateLearningStats(selectedLetters: [Character], correctLetters: [Character]) {
-        for (index, letter) in correctLetters.enumerated() {
-            if var stats = letterStats[letter] {
-                stats.total += 1
-                if index < selectedLetters.count && selectedLetters[index] == letter {
-                    stats.correct += 1
-                }
-                letterStats[letter] = stats
-            }
-        }
-    }
-
-    // Calculate approximate total Morse code play duration
-    private func calculateMorseDuration(for letters: [Character]) -> TimeInterval {
-        let dot = 0.1, dash = 0.3, intra = dot, inter = dot * 3
-        var duration: TimeInterval = 0
-        for (i, ch) in letters.enumerated() {
-            guard let code = MorseCodePlayer.shared.mapping[ch] else { continue }
-            for symbol in code {
-                duration += (symbol == "." ? dot : dash) + intra
-            }
-            if i < letters.count - 1 { duration += inter }
-        }
-        return duration
-    }
-
-    // Spawn balls for current round
-    private func spawnRoundBalls() {
-        for letter in roundLetters {
-            createPigBall(with: letter)
-        }
-    }
-
-    // Create and add a pig ball showing the given letter
     private func createPigBall(with letter: Character) {
         let pigSize = PigTextureGenerator.shared.recommendedPigSize
         let pigTexture = PigTextureGenerator.shared.generatePigTexture(for: letter, size: pigSize)
@@ -222,22 +159,13 @@ class GameScene: SKScene {
         pigSprite.size = pigSize
         
         let radius = pigSize.width / 2
-        let xPos = CGFloat.random(in: radius...(size.width - radius))
-        let yPos = size.height - radius - 10
-        pigSprite.position = CGPoint(x: xPos, y: yPos)
+        pigSprite.position = CGPoint(x: CGFloat.random(in: radius...(size.width - radius)), y: size.height - radius - 10)
         pigSprite.name = "ball"
-        
         pigSprite.userData = NSMutableDictionary()
         pigSprite.userData?["letter"] = String(letter)
         
-        let bodyCenter = CGPoint(x: 0, y: -pigSize.height * 0.1)
-        let bodyRadius = pigSize.width * 0.35
-        let bodyCircle = SKPhysicsBody(circleOfRadius: bodyRadius, center: bodyCenter)
-        
-        let signSize = CGSize(width: pigSize.width * 0.8, height: pigSize.height * 0.3)
-        let signCenter = CGPoint(x: 0, y: pigSize.height * 0.3)
-        let bodyRectangle = SKPhysicsBody(rectangleOf: signSize, center: signCenter)
-
+        let bodyCircle = SKPhysicsBody(circleOfRadius: pigSize.width * 0.35, center: CGPoint(x: 0, y: -pigSize.height * 0.1))
+        let bodyRectangle = SKPhysicsBody(rectangleOf: CGSize(width: pigSize.width * 0.8, height: pigSize.height * 0.3), center: CGPoint(x: 0, y: pigSize.height * 0.3))
         let body = SKPhysicsBody(bodies: [bodyCircle, bodyRectangle])
         
         body.affectedByGravity = true
@@ -246,12 +174,84 @@ class GameScene: SKScene {
         body.angularDamping = 0.8
         body.velocity = CGVector(dx: CGFloat.random(in: -15...15), dy: CGFloat.random(in: -40 ... -15))
         body.angularVelocity = CGFloat.random(in: -0.5...0.5)
-        pigSprite.physicsBody = body
         
+        // --- Set up pig physics for contact detection ---
+        body.categoryBitMask = PhysicsCategory.pig
+        body.contactTestBitMask = PhysicsCategory.flame // Important!
+        body.collisionBitMask = 0xFFFFFFFF // Collide with everything else
+        
+        pigSprite.physicsBody = body
         addChild(pigSprite)
     }
+    
+    // MARK: - Physics Contact Delegate
+    
+    func didBegin(_ contact: SKPhysicsContact) {
+        let firstBody: SKPhysicsBody
+        let secondBody: SKPhysicsBody
+        
+        if contact.bodyA.categoryBitMask < contact.bodyB.categoryBitMask {
+            firstBody = contact.bodyA
+            secondBody = contact.bodyB
+        } else {
+            firstBody = contact.bodyB
+            secondBody = contact.bodyA
+        }
+        
+        // Check for pig and flame contact
+        if (firstBody.categoryBitMask & PhysicsCategory.pig != 0) &&
+           (secondBody.categoryBitMask & PhysicsCategory.flame != 0) {
+            if let pigNode = firstBody.node as? SKSpriteNode {
+                handlePigFlameContact(pigNode: pigNode)
+            }
+        }
+    }
+    
+    private func handlePigFlameContact(pigNode: SKSpriteNode) {
+        // Prevent multiple calls and the spawn-smoke bug
+        guard pigNode.parent != nil, pigNode.position.y < (size.height * 0.8) else { return }
+        
+        // Remove physics body to stop further interactions
+        pigNode.physicsBody = nil
+        
+        // Create a puff of smoke
+        createPuffOfSmoke(at: pigNode.position)
+        
+        // Remove the pig
+        pigNode.removeFromParent()
+    }
 
-    // Handle taps and swipes
+    private func createPuffOfSmoke(at position: CGPoint) {
+        let smokeEmitter = SKEmitterNode()
+        smokeEmitter.particleTexture = ParticleTextureGenerator.shared.getSmokeTexture()
+        smokeEmitter.particlePosition = position
+        
+        // More pronounced smoke effect
+        smokeEmitter.particleSize = CGSize(width: 80, height: 80)
+        // Change smoke color to white
+        smokeEmitter.particleColor = .white
+        smokeEmitter.particleColorBlendFactor = 1.0
+        smokeEmitter.particleAlpha = 0.9
+        smokeEmitter.particleAlphaSpeed = -0.6
+        smokeEmitter.particleBirthRate = 300
+        smokeEmitter.particleLifetime = 2.0
+        smokeEmitter.particleScale = 0.1
+        smokeEmitter.particleScaleSpeed = 0.75
+        smokeEmitter.particleSpeed = 40
+        smokeEmitter.emissionAngleRange = .pi * 2
+        
+        addChild(smokeEmitter)
+        
+        // Clean up the emitter after it's done
+        let removeAction = SKAction.sequence([
+            SKAction.wait(forDuration: 1.5),
+            SKAction.removeFromParent()
+        ])
+        smokeEmitter.run(removeAction)
+    }
+
+    // MARK: - Touches and Input Handling
+    
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         if isGameOver {
             restartGame()
@@ -270,9 +270,7 @@ class GameScene: SKScene {
 
         for touch in touches {
             let location = touch.location(in: self)
-            let hitNodes = nodes(at: location)
-            
-            let ballNodes = hitNodes.filter { $0.name == "ball" }
+            let ballNodes = nodes(at: location).filter { $0.name == "ball" }
             
             for pigNode in ballNodes {
                 guard let pigSprite = pigNode as? SKSpriteNode,
@@ -282,18 +280,16 @@ class GameScene: SKScene {
                 else { continue }
                 
                 if selectedOrder.count < roundLetters.count && tappedLetter == roundLetters[selectedOrder.count] {
-                    // Correct tap
                     pigSprite.userData?["isBeingRemoved"] = true
                     selectedOrder.append(tappedLetter)
                     
-                    let disappearAction = SKAction.group([
-                        .scale(to: 0.1, duration: 0.3),
-                        .fadeOut(withDuration: 0.3)
-                    ])
-                    pigSprite.run(SKAction.sequence([disappearAction, .removeFromParent()]))
+                    // --- FIX: Immediately disable physics on correct taps ---
+                    // This prevents the pig from triggering a flame collision while it's fading out.
+                    pigSprite.physicsBody = nil
                     
+                    let disappearAction = SKAction.group([.scale(to: 0.1, duration: 0.3), .fadeOut(withDuration: 0.3)])
+                    pigSprite.run(SKAction.sequence([disappearAction, .removeFromParent()]))
                 } else {
-                    // Incorrect tap
                     triggerPenalty()
                     return
                 }
@@ -304,117 +300,105 @@ class GameScene: SKScene {
     private func triggerPenalty() {
         isPenaltyActive = true
         perfectRoundStreak = 0
-
-        let remainingPigs = children.filter { $0.name == "ball" }
+        
         let turnBlue = SKAction.colorize(with: .systemBlue, colorBlendFactor: 0.9, duration: 0.1)
         let restoreColor = SKAction.colorize(withColorBlendFactor: 0.0, duration: 0.2)
         let wait = SKAction.wait(forDuration: penaltyDuration)
         
-        let penaltySequence = SKAction.sequence([turnBlue, wait, restoreColor])
-        remainingPigs.forEach { $0.run(penaltySequence, withKey: "penalty_\($0.hash)") }
-
-        let endPenaltySequence = SKAction.sequence([
-            .wait(forDuration: penaltyDuration + 0.3),
-            .run { [weak self] in
-                self?.isPenaltyActive = false
-            }
-        ])
-        run(endPenaltySequence)
+        children.filter { $0.name == "ball" }.forEach { $0.run(SKAction.sequence([turnBlue, wait, restoreColor])) }
+        
+        run(SKAction.sequence([.wait(forDuration: penaltyDuration + 0.3), .run { [weak self] in self?.isPenaltyActive = false }]))
     }
 
-    private func updateFailureDisplay() {
-        // Clear previous indicators.
-        failureIndicatorNodes.forEach { $0.removeFromParent() }
-        failureIndicatorNodes.removeAll()
-
-        guard failedRoundsCounter > 0 else { return }
-
-        // Create a template to measure the size of the emoji.
-        let hamLabelTemplate = SKLabelNode(text: "🍖")
-        hamLabelTemplate.fontSize = 30
-        let hamWidth = hamLabelTemplate.frame.width
-        let spacing: CGFloat = 5
+    // MARK: - Game State and Update Loop
+    
+    override func update(_ currentTime: TimeInterval) {
+        // Clean up any balls that fell off screen (as a fallback)
+        children.forEach { node in
+            if node.name == "ball" && node.position.y < -ballRadius {
+                node.removeFromParent()
+            }
+        }
         
-        // 1. Calculate the total width required for ALL possible hams (maxFailedRounds).
-        let maxHams = maxFailedRounds
-        let totalPossibleWidth = (CGFloat(maxHams) * hamWidth) + (CGFloat(max(0, maxHams - 1)) * spacing)
-        
-        // 2. Determine the starting X position for the first (leftmost) ham in this pre-allocated space.
-        let startX = (size.width - 20) - totalPossibleWidth
-
-        // 3. Create and place the ham emojis from left to right within this space.
-        for i in 0..<failedRoundsCounter {
-            let hamLabel = SKLabelNode(text: "🍖")
-            hamLabel.fontSize = 30
-            
-            // Position each ham sequentially from the start position. They will not move once placed.
-            let xPos = startX + (hamWidth / 2) + (CGFloat(i) * (hamWidth + spacing))
-            let yPos = scoreLabel.position.y - scoreLabel.frame.height - 20
-            hamLabel.position = CGPoint(x: xPos, y: yPos)
-            
-            addChild(hamLabel)
-            failureIndicatorNodes.append(hamLabel)
+        // Check for round completion
+        if !nextRoundScheduled && children.first(where: { $0.name == "ball" }) == nil {
+            evaluateRound()
         }
     }
-
-    private func showGameOver() {
-        isGameOver = true
+    
+    private func evaluateRound() {
+        updateLearningStats(selectedLetters: selectedOrder, correctLetters: roundLetters)
         
-        removeAllActions()
-
-        let overlay = SKShapeNode(rectOf: size)
-        overlay.fillColor = .black
-        overlay.alpha = 0.0
-        overlay.position = CGPoint(x: size.width / 2, y: size.height / 2)
-        overlay.zPosition = 10
-        overlay.name = "gameOverOverlay"
-        addChild(overlay)
-
-        let gameOverLabel = SKLabelNode(text: "Game Over")
-        gameOverLabel.fontName = "Helvetica-Bold"
-        gameOverLabel.fontSize = 48
-        gameOverLabel.fontColor = .white
-        gameOverLabel.position = CGPoint(x: size.width / 2, y: size.height * 0.6)
-        gameOverLabel.alpha = 0.0
-        gameOverLabel.zPosition = 11
-        gameOverLabel.name = "gameOverLabel"
-        addChild(gameOverLabel)
+        var correctInSequence = 0
+        for i in 0..<min(selectedOrder.count, roundLetters.count) {
+            if selectedOrder[i] == roundLetters[i] {
+                correctInSequence += 1
+            } else {
+                break
+            }
+        }
         
-        let finalScoreLabel = SKLabelNode(text: "Final Score: \(score)")
-        finalScoreLabel.fontName = "Helvetica"
-        finalScoreLabel.fontSize = 24
-        finalScoreLabel.fontColor = .white
-        finalScoreLabel.position = CGPoint(x: size.width / 2, y: size.height * 0.5)
-        finalScoreLabel.alpha = 0.0
-        finalScoreLabel.zPosition = 11
-        finalScoreLabel.name = "gameOverLabel"
-        addChild(finalScoreLabel)
+        if correctInSequence > 0 {
+            failedRoundsCounter = 0 // Reset on any correct tap
+            updateScore(correctCount: correctInSequence)
+        } else {
+            perfectRoundStreak = 0
+            failedRoundsCounter += 1
+        }
         
-        let restartLabel = SKLabelNode(text: "Tap to Restart")
-        restartLabel.fontName = "Helvetica"
-        restartLabel.fontSize = 20
-        restartLabel.fontColor = .white
-        restartLabel.position = CGPoint(x: size.width / 2, y: size.height * 0.4)
-        restartLabel.alpha = 0.0
-        restartLabel.zPosition = 11
-        restartLabel.name = "gameOverLabel"
-        addChild(restartLabel)
-
-        let fadeIn = SKAction.fadeIn(withDuration: 0.5)
-        let fadeOverlay = SKAction.fadeAlpha(to: 0.7, duration: 0.5)
-        overlay.run(fadeOverlay)
-        gameOverLabel.run(fadeIn)
-        finalScoreLabel.run(fadeIn)
-        restartLabel.run(fadeIn)
+        updateFailureDisplay()
+        
+        if failedRoundsCounter >= maxFailedRounds {
+            endGame()
+        } else {
+            checkForAdvancement()
+            startNextRound()
+        }
     }
-
+    
+    private func updateScore(correctCount: Int) {
+        let sequencePoints = correctCount * pointsPerCorrectLetter
+        var totalPointsEarned = sequencePoints
+        var isComplete = false
+        var streakBonus = 0
+        
+        if correctCount == roundLetters.count {
+            isComplete = true
+            perfectRoundStreak += 1
+            if roundLetters.count >= minBallsForBonus {
+                totalPointsEarned += completionBonusPerBall * roundLetters.count
+            }
+            if perfectRoundStreak > 0 && perfectRoundStreak % streakBonusInterval == 0 {
+                streakBonus = streakBonusPoints * perfectRoundStreak
+                totalPointsEarned += streakBonus
+            }
+        } else {
+            perfectRoundStreak = 0
+        }
+        
+        score += totalPointsEarned
+        scoreLabel.text = "Score: \(score)"
+        
+        let flashColor: UIColor = streakBonus > 0 ? .purple : (isComplete ? .green : .orange)
+        let flashAction = SKAction.sequence([
+            .run { self.scoreLabel.fontColor = flashColor },
+            .wait(forDuration: 0.5),
+            .run { self.scoreLabel.fontColor = .black }
+        ])
+        scoreLabel.run(flashAction)
+    }
+    
+    private func endGame() {
+        nextRoundScheduled = true
+        run(SKAction.sequence([.wait(forDuration: gameOverDelay), .run { [weak self] in self?.showGameOver() }]))
+    }
+    
     private func restartGame() {
-        children.filter { $0.name == "gameOverOverlay" || $0.name == "gameOverLabel" }.forEach { $0.removeFromParent() }
+        children.filter { $0.name?.starts(with: "gameOver") ?? false }.forEach { $0.removeFromParent() }
 
         isGameOver = false
         score = 0
         failedRoundsCounter = 0
-        updateFailureDisplay() // Clear the emojis from the screen.
         perfectRoundStreak = 0
         selectedOrder.removeAll()
         
@@ -422,90 +406,157 @@ class GameScene: SKScene {
         
         scoreLabel.text = "Score: \(score)"
         progressLabel.text = updateProgressText()
+        updateFailureDisplay()
         
         startNextRound()
     }
+    
+    private func showGameOver() {
+        isGameOver = true
+        removeAllActions()
 
-    override func update(_ currentTime: TimeInterval) {
-        // Clean up any balls that fell off screen
-        children.forEach { node in
-            if node.name == "ball" && node.position.y < -ballRadius {
-                node.removeFromParent()
-            }
+        let overlay = SKShapeNode(rectOf: size)
+        overlay.fillColor = .black
+        overlay.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        overlay.zPosition = 10
+        overlay.name = "gameOverOverlay"
+        
+        let gameOverLabel = SKLabelNode(text: "Game Over")
+        gameOverLabel.fontName = "Helvetica-Bold"
+        gameOverLabel.fontSize = 48
+        gameOverLabel.fontColor = .white
+        gameOverLabel.position = CGPoint(x: 0, y: size.height * 0.1)
+        gameOverLabel.zPosition = 11
+        gameOverLabel.name = "gameOverLabel"
+        
+        let finalScoreLabel = SKLabelNode(text: "Final Score: \(score)")
+        finalScoreLabel.fontName = "Helvetica"
+        finalScoreLabel.fontSize = 24
+        finalScoreLabel.fontColor = .white
+        finalScoreLabel.position = .zero
+        finalScoreLabel.zPosition = 11
+        finalScoreLabel.name = "gameOverLabel"
+        
+        let restartLabel = SKLabelNode(text: "Tap to Restart")
+        restartLabel.fontName = "Helvetica"
+        restartLabel.fontSize = 20
+        restartLabel.fontColor = .white
+        restartLabel.position = CGPoint(x: 0, y: -size.height * 0.1)
+        restartLabel.zPosition = 11
+        restartLabel.name = "gameOverLabel"
+        
+        overlay.addChild(gameOverLabel)
+        overlay.addChild(finalScoreLabel)
+        overlay.addChild(restartLabel)
+        addChild(overlay)
+
+        overlay.alpha = 0
+        overlay.run(SKAction.fadeAlpha(to: 0.7, duration: 0.5))
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func updateFailureDisplay() {
+        failureIndicatorNodes.forEach { $0.removeFromParent() }
+        failureIndicatorNodes.removeAll()
+
+        guard failedRoundsCounter > 0 else { return }
+
+        let hamTemplate = SKLabelNode(text: "🍖")
+        hamTemplate.fontSize = 30
+        let hamWidth = hamTemplate.frame.width
+        let spacing: CGFloat = 5
+        let totalPossibleWidth = (CGFloat(maxFailedRounds) * hamWidth) + (CGFloat(max(0, maxFailedRounds - 1)) * spacing)
+        let startX = (size.width - 20) - totalPossibleWidth
+
+        for i in 0..<failedRoundsCounter {
+            let hamLabel = SKLabelNode(text: "🍖")
+            hamLabel.fontSize = 30
+            let xPos = startX + (hamWidth / 2) + (CGFloat(i) * (hamWidth + spacing))
+            let yPos = scoreLabel.position.y - scoreLabel.frame.height - 20
+            hamLabel.position = CGPoint(x: xPos, y: yPos)
+            addChild(hamLabel)
+            failureIndicatorNodes.append(hamLabel)
+        }
+    }
+    
+    private func initializeLearningStats() {
+        currentLearningStage = min(2, letterProgression.count - 1)
+        for i in 0...currentLearningStage {
+            letterStats[letterProgression[i]] = (correct: 0, total: 0)
+        }
+    }
+    
+    private func generateRoundLetters(allowDuplicates: Bool = false) -> [Character] {
+        let availableLetters = Array(letterProgression[0...currentLearningStage])
+        let count = Int.random(in: 1...min(4, availableLetters.count))
+        
+        if allowDuplicates {
+            return (0..<count).compactMap { _ in availableLetters.randomElement() }
+        } else {
+            var uniqueLetters = availableLetters
+            uniqueLetters.shuffle()
+            return Array(uniqueLetters.prefix(count))
+        }
+    }
+    
+    private func updateProgressText() -> String {
+        return "Learning: \(currentLearningStage + 1)/\(letterProgression.count) letters"
+    }
+    
+    private func checkForAdvancement() {
+        guard currentLearningStage < letterProgression.count - 1 else { return }
+        
+        let currentStageLetters = letterProgression[0...currentLearningStage]
+        let canAdvance = currentStageLetters.allSatisfy { letter in
+            guard let stats = letterStats[letter] else { return false }
+            let accuracy = stats.total > 0 ? Double(stats.correct) / Double(stats.total) : 0.0
+            return stats.correct >= masteryThreshold && accuracy >= minAccuracyForAdvancement
         }
         
-        // When all balls are gone, check the sequence
-        if !nextRoundScheduled && children.first(where: { $0.name == "ball" }) == nil {
+        if canAdvance {
+            currentLearningStage += 1
+            let newLetter = letterProgression[currentLearningStage]
+            letterStats[newLetter] = (correct: 0, total: 0)
+            progressLabel.text = updateProgressText()
             
-            updateLearningStats(selectedLetters: selectedOrder, correctLetters: roundLetters)
-            
-            var correctInSequence = 0
-            for i in 0..<min(selectedOrder.count, roundLetters.count) {
-                if selectedOrder[i] == roundLetters[i] {
-                    correctInSequence += 1
-                } else {
-                    break
+            let celebrateAction = SKAction.sequence([
+                .run { self.progressLabel.fontColor = .green },
+                .wait(forDuration: 1.0),
+                .run { self.progressLabel.fontColor = .darkGray }
+            ])
+            progressLabel.run(celebrateAction)
+        }
+    }
+    
+    private func updateLearningStats(selectedLetters: [Character], correctLetters: [Character]) {
+        for (index, letter) in correctLetters.enumerated() {
+            if var stats = letterStats[letter] {
+                stats.total += 1
+                if index < selectedLetters.count && selectedLetters[index] == letter {
+                    stats.correct += 1
                 }
+                letterStats[letter] = stats
             }
-            
-            if correctInSequence > 0 {
-                failedRoundsCounter = 0
-                let sequencePoints = correctInSequence * pointsPerCorrectLetter
-                var totalPointsEarned = sequencePoints
-                var isComplete = false
-                var streakBonus = 0
-                
-                if correctInSequence == roundLetters.count {
-                    perfectRoundStreak += 1
-                    if roundLetters.count >= minBallsForBonus {
-                        let completionBonus = completionBonusPerBall * roundLetters.count
-                        totalPointsEarned += completionBonus
-                        isComplete = true
-                    }
-                    if perfectRoundStreak > 0 && perfectRoundStreak % streakBonusInterval == 0 {
-                        streakBonus = streakBonusPoints * perfectRoundStreak
-                        totalPointsEarned += streakBonus
-                    }
-                } else {
-                    perfectRoundStreak = 0
-                }
-                
-                score += totalPointsEarned
-                scoreLabel.text = "Score: \(score)"
-                
-                let flashColor: UIColor = streakBonus > 0 ? .purple : (isComplete ? .green : .orange)
-                let flashAction = SKAction.sequence([
-                    .run { self.scoreLabel.fontColor = flashColor },
-                    .wait(forDuration: 0.5),
-                    .run { self.scoreLabel.fontColor = .black }
-                ])
-                scoreLabel.run(flashAction)
-            } else {
-                perfectRoundStreak = 0
-                failedRoundsCounter += 1
-            }
-            
-            // If the player got at least one correct, reset the failure counter.
-            if correctInSequence > 0 {
-                failedRoundsCounter = 0
-            }
-            
-            // Update the visual display of hams.
-            updateFailureDisplay()
+        }
+    }
 
-            // Check if the game is over AFTER updating the display.
-            if failedRoundsCounter >= maxFailedRounds {
-                nextRoundScheduled = true // Stop the game loop.
-                let wait = SKAction.wait(forDuration: gameOverDelay)
-                let show = SKAction.run { [weak self] in self?.showGameOver() }
-                run(SKAction.sequence([wait, show]))
-                return
+    private func calculateMorseDuration(for letters: [Character]) -> TimeInterval {
+        let dot = 0.1, dash = 0.3, intra = dot, inter = dot * 3
+        var duration: TimeInterval = 0
+        for (i, ch) in letters.enumerated() {
+            guard let code = MorseCodePlayer.shared.mapping[ch] else { continue }
+            for symbol in code {
+                duration += (symbol == "." ? dot : dash) + intra
             }
-            
-            checkForAdvancement()
-            
-            // Start the next round
-            startNextRound()
+            if i < letters.count - 1 { duration += inter }
+        }
+        return duration
+    }
+    
+    private func spawnRoundBalls() {
+        for letter in roundLetters {
+            createPigBall(with: letter)
         }
     }
 }

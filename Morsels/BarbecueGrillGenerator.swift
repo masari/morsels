@@ -1,0 +1,155 @@
+import SpriteKit
+import UIKit
+
+class BarbecueGrillGenerator {
+    static let shared = BarbecueGrillGenerator()
+    
+    private init() {}
+    
+    private var animationCache: [String: [SKTexture]] = [:]
+    
+    func generateGrillAnimationFrames(size: CGSize, frameCount: Int = 4) -> [SKTexture] {
+        let cacheKey = "grill_anim_\(Int(size.width))x\(Int(size.height))"
+        if let cachedFrames = animationCache[cacheKey] {
+            return cachedFrames
+        }
+        
+        var frames: [SKTexture] = []
+        for _ in 0..<frameCount {
+            let texture = createGrillTexture(size: size, isAnimated: true)
+            frames.append(texture)
+        }
+        
+        animationCache[cacheKey] = frames
+        return frames
+    }
+    
+    private func createGrillTexture(size: CGSize, isAnimated: Bool) -> SKTexture {
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let image = renderer.image { context in
+            let ctx = context.cgContext
+            
+            ctx.translateBy(x: 0, y: size.height)
+            ctx.scaleBy(x: 1.0, y: -1.0)
+            
+            drawBrickBase(ctx: ctx, size: size)
+            drawGrillTop(ctx: ctx, size: size)
+            drawWallOfFire(ctx: ctx, size: size, isAnimated: isAnimated)
+        }
+        return SKTexture(image: image)
+    }
+    
+    private func drawBrickBase(ctx: CGContext, size: CGSize) {
+        let brickRect = CGRect(x: 0, y: 0, width: size.width, height: size.height * 0.4)
+        let colors = [
+            UIColor(red: 0.7, green: 0.25, blue: 0.15, alpha: 1.0).cgColor,
+            UIColor(red: 0.9, green: 0.4, blue: 0.25, alpha: 1.0).cgColor
+        ]
+        let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors as CFArray, locations: [0.0, 1.0])!
+        ctx.drawLinearGradient(gradient, start: CGPoint(x: brickRect.midX, y: brickRect.minY), end: CGPoint(x: brickRect.midX, y: brickRect.maxY), options: [])
+        drawBrickPattern(ctx: ctx, in: brickRect)
+        ctx.setStrokeColor(UIColor(red: 0.5, green: 0.15, blue: 0.1, alpha: 1.0).cgColor)
+        ctx.setLineWidth(3)
+        ctx.stroke(brickRect)
+    }
+    
+    private func drawBrickPattern(ctx: CGContext, in rect: CGRect) {
+        let brickWidth: CGFloat = rect.width / 8
+        let brickHeight: CGFloat = rect.height / 4
+        ctx.setStrokeColor(UIColor(red: 0.4, green: 0.1, blue: 0.05, alpha: 0.8).cgColor)
+        ctx.setLineWidth(2)
+        for row in 0..<4 {
+            let y = rect.minY + (CGFloat(row) * brickHeight)
+            let offset = (row % 2 == 0) ? 0 : brickWidth / 2
+            ctx.move(to: CGPoint(x: rect.minX, y: y))
+            ctx.addLine(to: CGPoint(x: rect.maxX, y: y))
+            ctx.strokePath()
+            var x = rect.minX + offset
+            while x < rect.maxX {
+                ctx.move(to: CGPoint(x: x, y: y))
+                ctx.addLine(to: CGPoint(x: x, y: y + brickHeight))
+                ctx.strokePath()
+                x += brickWidth
+            }
+        }
+    }
+    
+    private func drawGrillTop(ctx: CGContext, size: CGSize) {
+        let grateRect = CGRect(x: size.width * 0.02, y: size.height * 0.38, width: size.width * 0.96, height: size.height * 0.05)
+        ctx.setFillColor(UIColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1.0).cgColor)
+        ctx.fill(grateRect)
+        ctx.setStrokeColor(UIColor(red: 0.3, green: 0.3, blue: 0.3, alpha: 1.0).cgColor)
+        ctx.setLineWidth(2)
+        let barSpacing = grateRect.width / 15
+        for i in 0...15 {
+            let x = grateRect.minX + CGFloat(i) * barSpacing
+            ctx.move(to: CGPoint(x: x, y: grateRect.minY))
+            ctx.addLine(to: CGPoint(x: x, y: grateRect.maxY))
+            ctx.strokePath()
+        }
+        ctx.setStrokeColor(UIColor.black.cgColor)
+        ctx.setLineWidth(2)
+        ctx.stroke(grateRect)
+    }
+    
+    private func drawWallOfFire(ctx: CGContext, size: CGSize, isAnimated: Bool) {
+        let flameBaseY = size.height * 0.30 // Lowered flame origin
+        let flameHeight = size.height * 0.65 // Adjusted height
+
+        let flames = [
+            FlameConfig(x: 0.25, width: 0.3, heightRatio: 0.9, color: UIColor(red: 0.9, green: 0.3, blue: 0.0, alpha: 0.8)),
+            FlameConfig(x: 0.5, width: 0.4, heightRatio: 1.0, color: UIColor(red: 0.9, green: 0.35, blue: 0.0, alpha: 0.85)),
+            FlameConfig(x: 0.75, width: 0.3, heightRatio: 0.9, color: UIColor(red: 0.9, green: 0.3, blue: 0.0, alpha: 0.8)),
+            FlameConfig(x: 0.15, width: 0.25, heightRatio: 0.8, color: UIColor(red: 1.0, green: 0.5, blue: 0.1, alpha: 0.9)),
+            FlameConfig(x: 0.4, width: 0.3, heightRatio: 0.9, color: UIColor(red: 1.0, green: 0.5, blue: 0.1, alpha: 0.95)),
+            FlameConfig(x: 0.6, width: 0.3, heightRatio: 0.85, color: UIColor(red: 1.0, green: 0.5, blue: 0.1, alpha: 0.92)),
+            FlameConfig(x: 0.85, width: 0.25, heightRatio: 0.8, color: UIColor(red: 1.0, green: 0.5, blue: 0.1, alpha: 0.9)),
+            FlameConfig(x: 0.2, width: 0.15, heightRatio: 0.6, color: UIColor(red: 1.0, green: 0.75, blue: 0.2, alpha: 1.0)),
+            FlameConfig(x: 0.5, width: 0.2, heightRatio: 0.7, color: UIColor(red: 1.0, green: 0.8, blue: 0.2, alpha: 1.0)),
+            FlameConfig(x: 0.8, width: 0.15, heightRatio: 0.65, color: UIColor(red: 1.0, green: 0.75, blue: 0.2, alpha: 1.0)),
+        ]
+        
+        for flame in flames {
+            let heightFlicker = isAnimated ? 1.0 + CGFloat.random(in: -0.2...0.2) : 1.0
+            let widthFlicker = isAnimated ? 1.0 + CGFloat.random(in: -0.15...0.15) : 1.0
+            let xFlicker = isAnimated ? CGFloat.random(in: -8...8) : 0
+            
+            drawOrganicFlame(ctx: ctx,
+                             centerX: (size.width * flame.x) + xFlicker,
+                             baseY: flameBaseY,
+                             width: (size.width * flame.width) * widthFlicker,
+                             height: (flameHeight * flame.heightRatio) * heightFlicker,
+                             color: flame.color)
+        }
+    }
+    
+    private struct FlameConfig {
+        let x, width, heightRatio: CGFloat
+        let color: UIColor
+    }
+    
+    private func drawOrganicFlame(ctx: CGContext, centerX: CGFloat, baseY: CGFloat, width: CGFloat, height: CGFloat, color: UIColor) {
+        ctx.setFillColor(color.cgColor)
+        let path = CGMutablePath()
+
+        let peakPoint = CGPoint(x: centerX, y: baseY + height)
+        let leftBasePoint = CGPoint(x: centerX - width / 2, y: baseY)
+        let rightBasePoint = CGPoint(x: centerX + width / 2, y: baseY)
+        
+        let peakControlOffset = width * 0.2
+
+        path.move(to: leftBasePoint)
+        
+        path.addCurve(to: peakPoint,
+                      control1: CGPoint(x: centerX - width * 0.4, y: baseY + height * 0.4),
+                      control2: CGPoint(x: peakPoint.x - peakControlOffset, y: peakPoint.y))
+        
+        path.addCurve(to: rightBasePoint,
+                      control1: CGPoint(x: peakPoint.x + peakControlOffset, y: peakPoint.y),
+                      control2: CGPoint(x: centerX + width * 0.4, y: baseY + height * 0.4))
+
+        path.closeSubpath()
+        ctx.addPath(path)
+        ctx.fillPath()
+    }
+}
