@@ -1,0 +1,127 @@
+
+Of course. Here is a detailed technical specification for the game "Morsels," designed for a language model to use for recreation. This specification is derived from the structure and logic of the Swift source code provided.
+
+Game Specification: Morsels
+
+1. High-Level Overview
+
+Morsels is an educational game designed to teach players International Morse Code in an engaging way. The core gameplay loop consists of listening to a sequence of letters played as Morse code, and then tapping falling objects (pigs) corresponding to those letters in the correct order. The game features a progressive learning system that introduces new letters as the player demonstrates mastery. It is built using a combination of SwiftUI for the application's user interface and menus, and SpriteKit for the main game scene.
+
+2. Core Technologies
+
+  - UI Framework: SwiftUI for menus, navigation, and overall app structure.
+  - Game Engine: SpriteKit for the 2D game scene, physics, and animations.
+  - Audio Engine: AVFoundation (AVAudioEngine) for on-the-fly generation and playback of Morse code sine-wave tones.
+  - Asset Generation: Core Graphics and UIKit for procedural generation of all visual assets (pigs, grill, particles). No static image assets are used.
+
+3. Application Structure & Flow
+
+1.  Splash Screen: A temporary, animated SwiftUI view (SplashScreenView) is displayed for 2 seconds upon app launch.
+2.  Main Menu (MainMenuView): The central navigation view. It provides three options:
+      - Play: Transitions to the GameView, starting the game.
+      - Instructions: Navigates to a scrollable view explaining the rules.
+      - Configuration: (Functionality not specified, but the button exists).
+3.  Game View (GameView): A SwiftUI view that acts as a bridge to the SpriteKit world. It uses a UIViewRepresentable to host an SKView.
+4.  Game Scene (GameScene.swift): The core SpriteKit scene where all gameplay occurs.
+5.  Pause Menu (PauseMenuView): A SwiftUI overlay that appears when the game is paused, managed by the central GameState.
+
+4. Game Scene (GameScene.swift) Specification
+
+4.1. Scene Setup
+
+  - Background: A solid light blue color (SKColor(red: 0.87, green: 0.94, blue: 1.0, alpha: 1.0)).
+  - Physics:
+      - Gravity is set to a weak downward vector: CGVector(dx: 0, dy: -0.4).
+      - The scene has a physics body acting as an edge boundary to contain nodes.
+      - It conforms to SKPhysicsContactDelegate to handle collisions.
+  - UI Elements:
+      - Score Label: Top-right corner, displays "Score: [current score]".
+      - Progress Label: Top-left corner, displays "Learning: [X]/26 letters".
+      - Failure Indicators: Displays "🍖" icons below the score for each failed round.
+  - Barbecue Grill:
+      - Positioned at the bottom of the screen.
+      - Procedurally generated and animated as two separate, layered SKSpriteNodes (grillBackground and grillForeground) to create a parallax effect where pigs fall between the layers.
+      - The background layer contains a static physics body (flame) that detects contact with pigs. This physics body should be an invisible rectangle positioned in the flame area.
+      - Physics Categories:
+          - pig: 0b1
+          - flame: 0b10
+
+4.2. Gameplay Loop
+
+1.  Start Round (startNextRound):
+    
+      - A sequence of letters is generated based on the player's current learning stage. The number of letters is random, from 1 to 4.
+      - The MorseCodePlayer plays the audio for this sequence.
+      - A delay (nextRoundDelay = 1.0s) is initiated. After the delay, the pig sprites are spawned.
+
+2.  Spawning (spawnRoundBalls):
+    
+      - For each letter in the round's sequence, a "pig" SKSpriteNode is created.
+      - Each pig's texture is procedurally generated with its corresponding letter on it.
+      - Pigs are spawned at random X positions at the top of the screen.
+      - They are given a physics body and a slight random initial velocity.
+
+3.  Player Interaction (handleTouches):
+    
+      - The player taps the screen.
+      - The game checks if a pig node was tapped.
+      - If the tapped pig's letter matches the next expected letter in the sequence, it's a correct tap. The pig is removed with a shrink/fade animation, and the score is updated.
+      - If the tapped pig's letter is incorrect, it's a wrong tap. A penalty is triggered where all pigs turn blue for 1 second, and no input is accepted. The player's perfect round streak is reset.
+
+4.  Round Evaluation (evaluateRound):
+    
+      - This function is called when all pig nodes from the current round are gone (either tapped or fallen off-screen).
+      - It updates the player's learning statistics based on their performance.
+      - If the player made at least one correct tap, the round is a success.
+      - If no pigs were tapped correctly, the failedRoundsCounter increases by one.
+      - If failedRoundsCounter reaches maxFailedRounds (3), the game ends.
+      - If the game does not end, the next round begins.
+
+4.3. Scoring System
+
+  - Base Points: 10 points per correctly tapped pig.
+  - Completion Bonus: If a full sequence is completed perfectly, a bonus of 50 points per pig in that sequence is awarded.
+  - Streak Bonus: For every 3 consecutive perfect rounds, a streak bonus of 25 * perfectRoundStreak points is awarded.
+  - Failed Round: A round where no pigs are tapped correctly. Resets the perfectRoundStreak.
+
+4.4. Learning & Progression System
+
+  - Letter Progression: The game has a predefined array of letters to learn, ordered by simplicity in Morse code: ["E", "T", "I", "A", "N", "M", ...]
+  - Learning Stage: The game tracks a currentLearningStage, which is an index into the progression array. The pool of available letters for a round is all letters from the start of the array up to this index.
+  - Advancement: After each round, the game checks if the player can advance. To advance, the player must meet two criteria for all letters in their current pool:
+    1.  A minimum number of correct taps (masteryThreshold = 5).
+    2.  A minimum accuracy percentage (minAccuracyForAdvancement = 0.8).
+  - If the criteria are met, currentLearningStage is incremented, and the next letter is added to the player's pool.
+
+4.5. Physics Contact
+
+  - When a pig's physics body makes contact with the grill's flame body, didBegin(_ contact:) is called.
+  - A guard check ensures this only triggers when the pig is near the bottom of the screen (e.g., position.y < size.height * 0.25) to prevent spurious contacts.
+  - The pig node is removed from the scene.
+  - A "puff of smoke" particle emitter is created at the exact contact.contactPoint.
+
+5. Procedural Asset Generation
+
+  - PigTextureGenerator: A class responsible for drawing a pig sprite. It should have a method like generatePigTexture(for: Character, size: CGSize) that draws a stylized pig shape and centers the given character on top of it.
+  - BarbecueGrillGenerator: Generates two SKTexture arrays for an animated grill.
+      - Background Layer: Contains the brick base and animated flames.
+      - Foreground Layer: Contains the grill bars.
+      - Animating these two layers simultaneously at different z-positions creates the layered effect.
+  - ParticleTextureGenerator: Generates a single, reusable SKTexture for the smoke particles. The texture should be a soft, white radial gradient that fades to transparent at the edges.
+
+6. Audio System (MorseCodePlayer.swift)
+
+  - Architecture: A singleton class (MorseCodePlayer.shared).
+  - Engine: Uses an AVAudioEngine with an AVAudioPlayerNode.
+  - Sound Generation:
+      - Does not use audio files.
+      - It pre-generates four AVAudioPCMBuffer instances containing raw sine-wave data:
+        1.  dotBuffer: A short tone (e.g., 0.1s at 800 Hz).
+        2.  dashBuffer: A longer tone (e.g., 0.3s).
+        3.  symbolGapBuffer: A short silence (0.1s).
+        4.  letterGapBuffer: A longer silence (0.3s).
+  - Playback Logic:
+      - The play(letters: [Character]) method looks up the Morse code string for each letter (e.g., "A" -> ".-").
+      - It builds an array of the pre-generated buffers in the correct sequence (e.g., [dot, symbolGap, dash, letterGap]).
+      - It then schedules this array of buffers for sequential playback on the AVAudioPlayerNode.
+

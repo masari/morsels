@@ -212,13 +212,14 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         if (firstBody.categoryBitMask & PhysicsCategory.pig != 0) &&
            (secondBody.categoryBitMask & PhysicsCategory.flame != 0) {
             if let pigNode = firstBody.node as? SKSpriteNode {
-                handlePigFlameContact(pigNode: pigNode)
+                handlePigFlameContact(pigNode: pigNode, contactPoint: contact.contactPoint)
             }
         }
     }
     
-    private func handlePigFlameContact(pigNode: SKSpriteNode) {
-        guard pigNode.parent != nil, pigNode.position.y < (size.height * 0.8) else { return }
+    private func handlePigFlameContact(pigNode: SKSpriteNode, contactPoint: CGPoint) {
+        // CORRECTED: Only process contact when the pig is near the bottom of the screen where the grill is.
+        guard pigNode.parent != nil, pigNode.position.y < (size.height * 0.25) else { return }
         
         pigNode.physicsBody = nil
         
