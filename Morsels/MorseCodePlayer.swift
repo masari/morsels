@@ -18,10 +18,10 @@ class MorseCodePlayer {
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
     private let sampleRate: Double = 44_100
-    private let toneFrequency: Double = 800  // Hz
+    private var toneFrequency: Double = 800  // Hz. Changed to var
 
-    private let dotBuffer: AVAudioPCMBuffer
-    private let dashBuffer: AVAudioPCMBuffer
+    private var dotBuffer: AVAudioPCMBuffer
+    private var dashBuffer: AVAudioPCMBuffer
     private let symbolGapBuffer: AVAudioPCMBuffer
     private let letterGapBuffer: AVAudioPCMBuffer
 
@@ -40,6 +40,9 @@ class MorseCodePlayer {
         let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
         engine.connect(player, to: engine.mainMixerNode, format: format)
 
+        // Load saved frequency or use default
+        self.toneFrequency = UserSettings.shared.tonePitch
+        
         // Pre‐generate buffers
         dotBuffer      = MorseCodePlayer.makeToneBuffer(duration: 0.1, sampleRate: sampleRate, freq: toneFrequency)
         dashBuffer     = MorseCodePlayer.makeToneBuffer(duration: 0.3, sampleRate: sampleRate, freq: toneFrequency)
@@ -81,6 +84,14 @@ class MorseCodePlayer {
         buf.frameLength = frameCount
         memset(buf.floatChannelData![0], 0, Int(frameCount) * MemoryLayout<Float>.size)
         return buf
+    }
+
+    /// Updates the tone frequency and regenerates the audio buffers.
+    func updateToneFrequency(_ newFrequency: Double) {
+        self.toneFrequency = newFrequency
+        self.dotBuffer = MorseCodePlayer.makeToneBuffer(duration: 0.1, sampleRate: self.sampleRate, freq: self.toneFrequency)
+        self.dashBuffer = MorseCodePlayer.makeToneBuffer(duration: 0.3, sampleRate: self.sampleRate, freq: self.toneFrequency)
+        print("Morse code tone frequency updated to \(newFrequency) Hz")
     }
 
     /// Play given letters as Morse code beeps.

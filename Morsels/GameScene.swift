@@ -51,6 +51,10 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     // Scene Nodes - Now layered
     private var grillBackground: SKSpriteNode!
     private var grillForeground: SKSpriteNode!
+    
+    weak var gameDelegate: GameSceneDelegate?
+    
+    private var sceneIsSetup = false
 
     override func didMove(to view: SKView) {
         backgroundColor = SKColor(red: 0.87, green: 0.94, blue: 1.0, alpha: 1.0)
@@ -108,6 +112,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         // --- Setup Background Layer (with Physics) ---
         grillBackground = SKSpriteNode(texture: backgroundFrames.first)
+        grillBackground.name = "grill" // Assign a name to detect touches
         grillBackground.size = grillSize
         grillBackground.position = CGPoint(x: size.width / 2, y: grillSize.height / 2)
         grillBackground.zPosition = -1 // BEHIND pigs
@@ -127,6 +132,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         // --- Setup Foreground Layer (Visual Only) ---
         grillForeground = SKSpriteNode(texture: foregroundFrames.first)
+        grillForeground.name = "grill"
         grillForeground.size = grillSize
         grillForeground.position = grillBackground.position
         grillForeground.zPosition = 1 // IN FRONT of pigs
@@ -263,6 +269,16 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             restartGame()
             return
         }
+
+        for touch in touches {
+            let location = touch.location(in: self)
+            let touchedNode = atPoint(location)
+            if touchedNode.name == "grill" {
+                gameDelegate?.pauseGame()
+                return
+            }
+        }
+
         handleTouches(touches)
     }
 

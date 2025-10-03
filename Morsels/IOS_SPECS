@@ -1,4 +1,3 @@
-
 Of course. Here is a detailed technical specification for the game "Morsels," designed for a language model to use for recreation. This specification is derived from the structure and logic of the Swift source code provided.
 
 Game Specification: Morsels
@@ -16,14 +15,13 @@ Morsels is an educational game designed to teach players International Morse Cod
 
 3. Application Structure & Flow
 
-1.  Splash Screen: A temporary, animated SwiftUI view (SplashScreenView) is displayed for 2 seconds upon app launch.
-2.  Main Menu (MainMenuView): The central navigation view. It provides three options:
-      - Play: Transitions to the GameView, starting the game.
-      - Instructions: Navigates to a scrollable view explaining the rules.
-      - Configuration: (Functionality not specified, but the button exists).
-3.  Game View (GameView): A SwiftUI view that acts as a bridge to the SpriteKit world. It uses a UIViewRepresentable to host an SKView.
-4.  Game Scene (GameScene.swift): The core SpriteKit scene where all gameplay occurs.
-5.  Pause Menu (PauseMenuView): A SwiftUI overlay that appears when the game is paused, managed by the central GameState.
+1.  **Startup Screen (MainMenuView):** This is the first screen the user sees when the app launches. It serves as the main menu and is built with SwiftUI. It contains three primary navigation buttons:
+    *   **Play Button:** Transitions the user directly to the `GameView`, starting a new game session.
+    *   **Instructions Button:** Navigates the user to a scrollable SwiftUI view (`InstructionsView`) that details the game rules and scoring.
+    *   **Config Button:** Navigates the user to a configuration screen (`ConfigurationView`) where game settings can be adjusted. (The specific functionality of the configuration screen is to be defined separately).
+2.  **Game View (GameView):** A SwiftUI view that acts as a bridge to the SpriteKit world. It uses a `UIViewRepresentable` to host an `SKView` where the actual game is rendered.
+3.  **Game Scene (GameScene.swift):** The core SpriteKit scene where all gameplay occurs, as detailed in Section 4.
+4.  **Pause Menu (PauseMenuView):** A SwiftUI overlay that appears on top of the `GameView` when the game is paused. This is managed by a shared `GameState` object.
 
 4. Game Scene (GameScene.swift) Specification
 
@@ -124,4 +122,3 @@ Morsels is an educational game designed to teach players International Morse Cod
       - The play(letters: [Character]) method looks up the Morse code string for each letter (e.g., "A" -> ".-").
       - It builds an array of the pre-generated buffers in the correct sequence (e.g., [dot, symbolGap, dash, letterGap]).
       - It then schedules this array of buffers for sequential playback on the AVAudioPlayerNode.
-

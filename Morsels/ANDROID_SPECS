@@ -1,0 +1,116 @@
+Absolutely. Here is a detailed technical specification for recreating the game "Morsels" on the Android platform, designed for a language model. It translates the concepts from the original Swift/SpriteKit implementation into the standard modern Android development stack using Kotlin, Jetpack Compose, and the LibGDX game framework.
+
+Android Game Specification: Morsels
+
+1. High-Level Overview
+
+(This section is platform-agnostic and remains the same as the iOS specification.)
+
+Morsels is an educational game designed to teach players International Morse Code...
+
+2. Core Technologies (Android Stack)
+
+  - Language: Kotlin.
+  - UI Framework: Jetpack Compose for all non-game screens (menus, instructions, etc.), navigation, and overall application structure.
+  - Game Engine: LibGDX, a cross-platform game development framework. This will be used to render the 2D game scene, manage the game loop, and handle animations.
+      - Physics Engine: Box2D, integrated within LibGDX, for 2D physics simulations (gravity, collisions).
+  - Audio Engine: Android's native AudioTrack class for low-level, on-the-fly generation and playback of raw PCM sine-wave data for the Morse code tones.
+  - Asset Generation: Android's Bitmap and Canvas API (android.graphics) for the procedural generation of all visual assets. These Bitmaps will be converted into LibGDX Texture objects at runtime.
+
+3. Application Structure & Flow (Android/Compose)
+
+1.  Single-Activity Architecture: The application should be a single MainActivity that hosts all UI.
+2.  Navigation: Use Jetpack Compose Navigation (NavHostController) to manage transitions between screens.
+3.  Composable Screens:
+      - SplashScreenComposable: A temporary, animated Composable displayed for 2 seconds upon app launch.
+      - MainMenuComposable: The central navigation Composable with buttons for "Play," "Instructions," and "Configuration."
+      - InstructionsComposable, ScoringComposable: Scrollable Composables displaying game rules.
+4.  State Management: A central GameStateViewModel (extending androidx.lifecycle.ViewModel) will hold and manage shared state like isPaused and shouldQuitGame using StateFlow or MutableState.
+5.  Game View Integration:
+      - The game itself will be managed by a LibGDX ApplicationAdapter or Screen.
+      - To display the game within the Compose UI, use the AndroidView Composable. This Composable will embed the View returned by the LibGDX initialize function, effectively hosting the game engine inside the SwiftUI-like layout.
+
+4. Game "Screen" (LibGDX) Specification
+
+The GameScene from SpriteKit translates to a LibGDX Screen.
+
+4.1. Screen Setup (show() method)
+
+  - Background: A solid light blue color, set via Gdx.gl.glClearColor().
+  - Physics World (Box2D):
+      - A World object is created with a weak downward gravity vector: Vector2(0, -0.4f).
+      - The screen boundaries are created as static Body objects to contain the pigs.
+      - A ContactListener is set on the world to handle collision events.
+  - UI Stage (Scene2D.ui):
+      - A LibGDX Stage is used to manage in-game UI elements.
+      - Score Label: A Label actor is added to the stage in the top-right.
+      - Progress Label: A Label actor is added to the stage in the top-left.
+      - Failure Indicators: Image actors (using a procedurally generated "🍖" texture) are added below the score.
+  - Barbecue Grill:
+      - Implemented as two separate LibGDX Actor instances with different z-indexes to create the layered effect.
+      - The animation is handled using LibGDX's Animation class with TextureRegions generated from the Canvas assets.
+      - The flame physics body is a static Box2D Body with a rectangular Fixture. Collision filtering is set up using category bits.
+      - Physics Categories (Collision Filtering):
+          - PIG_CATEGORY = 0x0001;
+          - FLAME_CATEGORY = 0x0002;
+
+4.2. Gameplay Loop (render() method)
+
+1.  Start Round:
+    
+      - (Logic remains the same: generate letters, play Morse code).
+      - A LibGDX Timer or Action is used to schedule the spawning of pigs after the nextRoundDelay.
+
+2.  Spawning:
+    
+      - For each letter, a dynamic Box2D Body is created.
+      - A corresponding LibGDX Actor or Sprite is created and its position is updated in the render loop to match its physics body.
+      - The texture is generated procedurally.
+      - A small random initial linear velocity is applied to the Body.
+
+3.  Player Interaction (InputProcessor):
+    
+      - The Screen implements InputProcessor to handle touch events.
+      - The touchDown method converts screen coordinates to world coordinates.
+      - It then queries the Box2D World to see if a pig's Fixture was tapped.
+      - The logic for correct/incorrect taps remains identical to the iOS spec.
+
+4.  Round Evaluation:
+    
+      - The logic is identical to the iOS spec. This is called from the render loop when all pig bodies/actors for the current round have been removed.
+
+4.3. Scoring, Learning & Progression
+
+(The logic for these systems is platform-agnostic and remains identical to the iOS specification.)
+
+4.5. Physics Contact (ContactListener)
+
+  - The beginContact method of the ContactListener is triggered.
+  - It checks if the two bodies involved are a pig and the flame using their fixture user data or category bits.
+  - A guard check (in Kotlin, an if statement) ensures the pig's position is near the bottom of the screen.
+  - The pig's Body is flagged for removal from the physics world. Its corresponding actor is removed from the stage/scene.
+  - A LibGDX ParticleEffect is created and positioned at the contact.getWorldManifold().getPoints()[0], which gives the precise point of contact.
+
+5. Procedural Asset Generation (Android Canvas)
+
+  - PigTextureGenerator: A Kotlin object (singleton).
+      - The generatePigTexture method creates a Bitmap of a specific size.
+      - It gets a Canvas for that Bitmap: val canvas = Canvas(bitmap).
+      - It uses Paint objects to define colors, styles, and text properties.
+      - It draws the pig shape and letter onto the canvas using methods like canvas.drawPath() and canvas.drawText().
+      - Finally, it converts the Bitmap into a LibGDX Texture: return Texture(bitmap).
+  - BarbecueGrillGenerator & ParticleTextureGenerator: Follow the same pattern: create a Bitmap, draw to its Canvas, and convert the final Bitmap to a LibGDX Texture.
+
+6. Audio System (MorseCodePlayer on Android)
+
+  - Architecture: A Kotlin object (singleton).
+  - Engine: An instance of the android.media.AudioTrack class.
+  - Sound Generation:
+      - It pre-generates ByteArray or ShortArray buffers containing raw PCM data for the sine waves.
+      - Four buffers are created: dotPcm, dashPcm, symbolGapPcm, and letterGapPcm.
+  - Playback Logic:
+      - The play(letters: List<Char>) method maps the letters to their Morse code strings.
+      - It concatenates the pre-generated PCM byte arrays into a single, large ByteArray for the entire sequence1
+      - This final ByteArray is written to the AudioTrack instance using the write() method.
+      - The play() method of the AudioTrack is called. This should be managed on a background thread (Coroutine or Executor) to prevent blocking the main game loop.
+
