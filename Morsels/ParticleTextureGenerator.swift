@@ -19,7 +19,6 @@ class ParticleTextureGenerator {
 
         let image = renderer.image { context in
             let ctx = context.cgContext
-            let rect = CGRect(origin: .zero, size: size)
 
             // Create a radial gradient from semi-transparent white in the center
             // to fully transparent at the edges. This creates a soft "puff" look.

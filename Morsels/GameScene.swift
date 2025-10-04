@@ -470,6 +470,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
         overlay.alpha = 0
         overlay.run(SKAction.fadeAlpha(to: 0.7, duration: 0.5))
+        
+        // --- Submit Score to Game Center ---
+        GameKitHelper.shared.submitScore(score, leaderboardID: GameKitHelper.leaderboardID)
     }
     
     // MARK: - Helper Methods

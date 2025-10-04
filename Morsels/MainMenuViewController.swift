@@ -1,4 +1,5 @@
 import UIKit
+import GameKit // Import GameKit
 
 class MainMenuViewController: UIViewController {
 
@@ -7,6 +8,16 @@ class MainMenuViewController: UIViewController {
         setupViews()
     }
     
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        
+        // Authenticate the player only once, when the view is fully on screen.
+        // This is the correct place to present a view controller.
+        if !GameKitHelper.shared.isAuthenticated {
+            GameKitHelper.shared.authenticateLocalPlayer(presentingVC: self)
+        }
+    }
+
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: animated)
@@ -31,10 +42,13 @@ class MainMenuViewController: UIViewController {
         let instructionsButton = createMenuButton(title: "Instructions", backgroundColor: .systemBlue)
         instructionsButton.addTarget(self, action: #selector(instructionsButtonTapped), for: .touchUpInside)
         
+        let leaderboardButton = createMenuButton(title: "Leaderboard", backgroundColor: .systemPurple)
+        leaderboardButton.addTarget(self, action: #selector(leaderboardButtonTapped), for: .touchUpInside)
+        
         let configButton = createMenuButton(title: "Configuration", backgroundColor: .systemGray)
         configButton.addTarget(self, action: #selector(configButtonTapped), for: .touchUpInside)
 
-        let stackView = UIStackView(arrangedSubviews: [playButton, instructionsButton, configButton])
+        let stackView = UIStackView(arrangedSubviews: [playButton, instructionsButton, leaderboardButton, configButton])
         stackView.axis = .vertical
         stackView.spacing = 20
         stackView.translatesAutoresizingMaskIntoConstraints = false
@@ -74,6 +88,10 @@ class MainMenuViewController: UIViewController {
     @objc func instructionsButtonTapped() {
         let instructionsVC = InstructionsViewController()
         navigationController?.pushViewController(instructionsVC, animated: true)
+    }
+
+    @objc func leaderboardButtonTapped() {
+        GameKitHelper.shared.showLeaderboard(presentingVC: self)
     }
 
     @objc func configButtonTapped() {
