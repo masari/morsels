@@ -1,5 +1,5 @@
 //
-//  InstructionsViewController.swift
+//  ScoringViewController.swift
 //  Morsels
 //
 //  Full UIKit implementation
@@ -7,7 +7,7 @@
 
 import UIKit
 
-class InstructionsViewController: UIViewController {
+class ScoringViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -16,7 +16,7 @@ class InstructionsViewController: UIViewController {
     
     private func setupViews() {
         view.backgroundColor = .systemBackground
-        title = "Instructions"
+        title = "Scoring Details"
         navigationController?.navigationBar.prefersLargeTitles = true
         
         // Create scroll view
@@ -34,7 +34,7 @@ class InstructionsViewController: UIViewController {
         
         // Title
         let titleLabel = UILabel()
-        titleLabel.text = "How to Play"
+        titleLabel.text = "Scoring"
         titleLabel.font = .systemFont(ofSize: 34, weight: .bold)
         titleLabel.numberOfLines = 0
         contentStack.addArrangedSubview(titleLabel)
@@ -45,20 +45,24 @@ class InstructionsViewController: UIViewController {
         titleSpacer.heightAnchor.constraint(equalToConstant: 10).isActive = true
         contentStack.addArrangedSubview(titleSpacer)
         
-        // Instructions
-        let instructions = [
-            ("ear", "Listen carefully to the sequence of Morse code letters played at the start of each round."),
-            ("hand.tap.fill", "Tap the falling pigs in the same sequence you heard."),
-            ("checkmark.circle.fill", "Correct taps will save the pigs and send them to the pigpen."),
-            ("xmark.octagon.fill", "An incorrect tap will trigger a brief penalty where you cannot select any pigs."),
-            ("flame.fill", "Don't let the pigs fall into the grill! Too many failed rounds will end the game."),
-            ("pause.circle.fill", "Need a break? Tap the grill at any time to pause the game.")
+        // Scoring rules
+        let scoringRules = [
+            ("10.circle", "You get 10 points for each correctly tapped pig in sequence."),
+            ("star.fill", "Completing a full sequence perfectly earns a completion bonus of 50 points per pig."),
+            ("arrow.up.circle.fill", "Achieve a streak of 3 perfect rounds for a streak bonus that grows over time."),
+            ("hand.thumbsdown.fill", "Failing to tap any pigs in the correct sequence will count as a failed round.")
         ]
         
-        for (icon, text) in instructions {
+        for (icon, text) in scoringRules {
             let row = InstructionRowView(icon: icon, text: text)
             contentStack.addArrangedSubview(row)
         }
+        
+        // Flexible spacer to push content to top
+        let flexibleSpacer = UIView()
+        flexibleSpacer.translatesAutoresizingMaskIntoConstraints = false
+        flexibleSpacer.setContentHuggingPriority(.defaultLow, for: .vertical)
+        contentStack.addArrangedSubview(flexibleSpacer)
         
         scrollView.addSubview(contentStack)
         

@@ -42,13 +42,16 @@ class MainMenuViewController: UIViewController {
         let instructionsButton = createMenuButton(title: "Instructions", backgroundColor: .systemBlue)
         instructionsButton.addTarget(self, action: #selector(instructionsButtonTapped), for: .touchUpInside)
         
+        let scoringButton = createMenuButton(title: "Scoring", backgroundColor: .systemOrange)
+        scoringButton.addTarget(self, action: #selector(scoringButtonTapped), for: .touchUpInside)
+        
         let leaderboardButton = createMenuButton(title: "Leaderboard", backgroundColor: .systemPurple)
         leaderboardButton.addTarget(self, action: #selector(leaderboardButtonTapped), for: .touchUpInside)
         
         let configButton = createMenuButton(title: "Configuration", backgroundColor: .systemGray)
         configButton.addTarget(self, action: #selector(configButtonTapped), for: .touchUpInside)
 
-        let stackView = UIStackView(arrangedSubviews: [playButton, instructionsButton, leaderboardButton, configButton])
+        let stackView = UIStackView(arrangedSubviews: [playButton, instructionsButton, scoringButton, leaderboardButton, configButton])
         stackView.axis = .vertical
         stackView.spacing = 20
         stackView.translatesAutoresizingMaskIntoConstraints = false
@@ -88,6 +91,11 @@ class MainMenuViewController: UIViewController {
     @objc func instructionsButtonTapped() {
         let instructionsVC = InstructionsViewController()
         navigationController?.pushViewController(instructionsVC, animated: true)
+    }
+
+    @objc func scoringButtonTapped() {
+        let scoringVC = ScoringViewController()
+        navigationController?.pushViewController(scoringVC, animated: true)
     }
 
     @objc func leaderboardButtonTapped() {
