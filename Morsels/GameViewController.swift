@@ -19,13 +19,27 @@ class GameViewController: UIViewController, GameSceneDelegate, PauseMenuDelegate
             let scene = GameScene(size: skView.bounds.size)
             scene.scaleMode = .aspectFill
             scene.gameDelegate = self // Set the delegate
-            // Remove background override - let GameScene set its own background
+            
+            // Present scene first
             skView.presentScene(scene)
+            
+            // THEN apply safe area insets (after didMove has run)
+            scene.applySafeAreaInsets(view.safeAreaInsets)
 
             skView.ignoresSiblingOrder = true
             
             skView.showsFPS = true
             skView.showsNodeCount = true
+        }
+    }
+    
+    // NEW: Update safe area when it changes (rotation, notch changes, etc.)
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        
+        if let skView = self.view as? SKView,
+           let scene = skView.scene as? GameScene {
+            scene.applySafeAreaInsets(view.safeAreaInsets)
         }
     }
 
