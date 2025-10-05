@@ -88,6 +88,13 @@ class GameSceneInput {
         
         isPenaltyActive = true
         
+        // Clear any "isBeingRemoved" flags from all pigs
+        worldNode.children.filter { $0.name == "ball" }.forEach { node in
+            if let sprite = node as? SKSpriteNode {
+                sprite.userData?["isBeingRemoved"] = false
+            }
+        }
+        
         // Get penalty duration from settings
         let penaltyDuration = UserSettings.shared.penaltyDuration
         
