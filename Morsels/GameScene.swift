@@ -1,14 +1,12 @@
 //
-//  GameScene.swift (Refactored)
+//  GameScene.swift (Updated with Speech Recognition)
 //  Morsels
-//
-//  Coordinator that orchestrates game managers and scene components
 //
 
 import SpriteKit
 import GameplayKit
 
-class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate {
+class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, SpeechRecognitionDelegate {
 
     // MARK: - Configuration Constants
     private struct Layout {
@@ -54,18 +52,18 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate {
     private var safeAreaInsets: UIEdgeInsets = .zero
     private var nextRoundScheduled = false
     private var isGameOver = false
+    private var isSpeechEnabled = false
     
     // MARK: - Delegate
     weak var gameDelegate: GameSceneDelegate?
 
     // MARK: - Initialization
     override init(size: CGSize) {
-        // Initialize progression manager with user settings
         self.progressionManager = LearningProgressionManager(
             initialStage: UserSettings.shared.initialLearningStage
         )
-        
         super.init(size: size)
+        setupSpeechRecognition()
     }
     
     required init?(coder aDecoder: NSCoder) {
@@ -73,39 +71,40 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate {
             initialStage: UserSettings.shared.initialLearningStage
         )
         super.init(coder: aDecoder)
+        setupSpeechRecognition()
+    }
+    
+    private func setupSpeechRecognition() {
+        SpeechRecognitionManager.shared.delegate = self
+        isSpeechEnabled = UserSettings.shared.isSpeechRecognitionEnabled
+        print("🎮 setupSpeechRecognition() - isSpeechEnabled: \(isSpeechEnabled)")
     }
 
     // MARK: - Scene Lifecycle
     override func didMove(to view: SKView) {
         backgroundColor = Visual.backgroundColor
         
-        // Create world node
         worldNode = SKNode()
         worldNode.name = "worldNode"
         addChild(worldNode)
         
-        // Initialize components
         renderer = GameSceneRenderer(worldNode: worldNode, sceneSize: size, safeAreaInsets: safeAreaInsets)
         physics = GameScenePhysics(worldNode: worldNode, sceneSize: size, safeAreaInsets: safeAreaInsets)
         input = GameSceneInput(worldNode: worldNode)
         input.delegate = self
         
-        // Setup physics
         physicsWorld.contactDelegate = self
         physics.setupPhysicsWorld(for: self)
         
-        // Setup grill
         setupBarbecueGrill()
         
-        // Setup UI
         renderer.setupUI()
         renderer.updateScore(scoreManager.score)
         renderer.updateProgress(progressionManager.progressText)
+        renderer.updateSpeechIndicator(isSpeechEnabled && SpeechRecognitionManager.shared.isListening)
         
-        // Preload textures
         PigTextureGenerator.shared.preloadCommonLetters()
         
-        // Start game
         startNextRound()
     }
     
@@ -146,7 +145,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate {
             frameCount: 4
         )
         
-        // Background layer (with physics)
         grillBackground = SKSpriteNode(texture: backgroundFrames.first)
         grillBackground.name = "grill"
         grillBackground.size = grillSize
@@ -171,7 +169,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate {
         
         worldNode.addChild(grillBackground)
         
-        // Foreground layer (visual only)
         grillForeground = SKSpriteNode(texture: foregroundFrames.first)
         grillForeground.name = "grill"
         grillForeground.size = grillSize
@@ -180,7 +177,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate {
         
         worldNode.addChild(grillForeground)
         
-        // Animate both layers
         let backgroundAnimation = SKAction.animate(with: backgroundFrames, timePerFrame: 0.15)
         let foregroundAnimation = SKAction.animate(with: foregroundFrames, timePerFrame: 0.15)
         
@@ -207,6 +203,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate {
             .wait(forDuration: Timing.nextRoundDelay - morseStartDelay),
             .run { [weak self] in
                 self?.spawnRoundPigs()
+                self?.startSpeechRecognitionIfEnabled()
                 self?.nextRoundScheduled = false
             }
         ])
@@ -219,17 +216,40 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate {
         }
     }
     
+    private func startSpeechRecognitionIfEnabled() {
+        print("🎮 startSpeechRecognitionIfEnabled() called")
+        print("🎮 isSpeechEnabled: \(isSpeechEnabled)")
+        print("🎮 isAuthorized: \(SpeechRecognitionManager.shared.isAuthorized)")
+        
+        guard isSpeechEnabled, SpeechRecognitionManager.shared.isAuthorized else {
+            print("🎮 Speech recognition not starting - enabled: \(isSpeechEnabled), authorized: \(SpeechRecognitionManager.shared.isAuthorized)")
+            return
+        }
+        
+        do {
+            try SpeechRecognitionManager.shared.startListening()
+            renderer.updateSpeechIndicator(true)
+            print("🎮 Speech recognition started successfully from GameScene")
+        } catch {
+            print("🎮 Failed to start speech recognition: \(error)")
+        }
+    }
+    
+    private func stopSpeechRecognition() {
+        SpeechRecognitionManager.shared.stopListening()
+        renderer.updateSpeechIndicator(false)
+    }
+    
     private func evaluateRound() {
-        // Update learning stats
+        stopSpeechRecognition()
+        
         progressionManager.updateStats(
             selectedLetters: roundManager.selectedOrder,
             correctLetters: roundManager.roundLetters
         )
         
-        // End round and check for failure
         roundManager.endRound()
         
-        // Update score if had any correct
         if roundManager.hadAnyCorrect {
             let result = scoreManager.calculateRoundScore(
                 correctCount: roundManager.correctInSequence,
@@ -240,14 +260,11 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate {
             scoreManager.resetStreak()
         }
         
-        // Update failure display
         renderer.updateFailureDisplay(count: roundManager.failedRoundsCount)
         
-        // Check for game over
         if roundManager.isGameOver {
             endGame()
         } else {
-            // Check for progression
             if progressionManager.checkForAdvancement() {
                 renderer.updateProgress(progressionManager.progressText, didAdvance: true)
             }
@@ -259,6 +276,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate {
     private func endGame() {
         isGameOver = true
         nextRoundScheduled = true
+        stopSpeechRecognition()
         
         run(SKAction.sequence([
             .wait(forDuration: Timing.gameOverDelay),
@@ -271,25 +289,20 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate {
     }
     
     private func restartGame() {
-        // Clear game over UI
         renderer.hideGameOver()
         
-        // Reset all managers
         scoreManager.reset()
         progressionManager.reset(to: UserSettings.shared.initialLearningStage)
         roundManager.reset()
         input.reset()
         
-        // Reset state
         isGameOver = false
         nextRoundScheduled = false
         
-        // Update UI
         renderer.updateScore(scoreManager.score)
         renderer.updateProgress(progressionManager.progressText)
         renderer.updateFailureDisplay(count: 0)
         
-        // Start fresh
         startNextRound()
     }
     
@@ -324,6 +337,49 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate {
     
     // MARK: - GameSceneInputDelegate
     func didTapPig(letter: Character, sprite: SKSpriteNode) -> Bool {
+        return handlePigSelection(letter: letter, sprite: sprite)
+    }
+    
+    func didTapGrill() {
+        stopSpeechRecognition()
+        gameDelegate?.pauseGame()
+    }
+    
+    // MARK: - SpeechRecognitionDelegate
+    func didRecognizeLetter(_ letter: Character) {
+        print("🎮 GameScene received letter: \(letter)")
+        print("🎮 Round active: \(roundManager.isRoundActive)")
+        print("🎮 Penalty active: \(input.isPenaltyActive)")
+        
+        guard roundManager.isRoundActive, !input.isPenaltyActive else {
+            print("🎮 Ignoring letter - round not active or penalty active")
+            return
+        }
+        
+        // Find the first pig with this letter
+        let pigs = physics.getAllPigs(from: worldNode)
+        print("🎮 Total pigs on screen: \(pigs.count)")
+        
+        for pig in pigs {
+            if let letterString = pig.userData?["letter"] as? String,
+               let pigLetter = letterString.first,
+               pigLetter == letter,
+               pig.userData?["isBeingRemoved"] as? Bool != true {
+                print("🎮 Found matching pig with letter \(letter), attempting selection")
+                let wasCorrect = handlePigSelection(letter: letter, sprite: pig)
+                print("🎮 Selection was correct: \(wasCorrect)")
+                break
+            }
+        }
+    }
+    
+    func speechRecognitionAvailabilityChanged(_ isAvailable: Bool) {
+        // Could show a visual indicator or warning
+        print("Speech recognition availability: \(isAvailable)")
+    }
+    
+    // MARK: - Shared Selection Logic
+    private func handlePigSelection(letter: Character, sprite: SKSpriteNode) -> Bool {
         guard roundManager.isRoundActive else { return false }
         
         let wasCorrect = roundManager.selectLetter(letter)
@@ -334,10 +390,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate {
         }
         
         return wasCorrect
-    }
-    
-    func didTapGrill() {
-        gameDelegate?.pauseGame()
     }
     
     // MARK: - Touch Handling
@@ -357,10 +409,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate {
     
     // MARK: - Update Loop
     override func update(_ currentTime: TimeInterval) {
-        // Remove offscreen pigs
         physics.removeOffscreenPigs(from: worldNode)
         
-        // Check if round is complete
         if !nextRoundScheduled && physics.getAllPigs(from: worldNode).isEmpty {
             evaluateRound()
         }

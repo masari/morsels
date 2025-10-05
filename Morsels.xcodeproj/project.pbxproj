@@ -399,6 +399,8 @@
 				DEVELOPMENT_TEAM = LGQJKP2RML;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
+				INFOPLIST_KEY_NSFileProviderDomainUsageDescription = "Morsels uses the microphone to recognize letter names so you can select pigs using your voice.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Morsels uses speech recognition to understand the letters you speak during gameplay.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -430,6 +432,8 @@
 				DEVELOPMENT_TEAM = LGQJKP2RML;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
+				INFOPLIST_KEY_NSFileProviderDomainUsageDescription = "Morsels uses the microphone to recognize letter names so you can select pigs using your voice.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Morsels uses speech recognition to understand the letters you speak during gameplay.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;

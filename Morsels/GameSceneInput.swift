@@ -45,7 +45,7 @@ class GameSceneInput {
         for touch in touches {
             let location = touch.location(in: worldNode)
             
-            // Check for grill tap first
+            // Check for grill tap first (only foreground, not flames)
             let touchedNode = worldNode.atPoint(location)
             if touchedNode.name == "grill" {
                 delegate?.didTapGrill()

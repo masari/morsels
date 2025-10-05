@@ -31,11 +31,34 @@ class ConfigurationViewController: UIViewController {
         learningDescription.font = UIFont.systemFont(ofSize: 14)
         learningDescription.textColor = .secondaryLabel
         learningDescription.numberOfLines = 0
-        learningDescription.tag = 999 // Tag for easy lookup
+        learningDescription.tag = 999
         
         let learningStackWithDesc = UIStackView(arrangedSubviews: [learningStack, learningDescription])
         learningStackWithDesc.axis = .vertical
         learningStackWithDesc.spacing = 5
+        
+        // --- Speech Recognition Toggle ---
+        let speechLabel = UILabel()
+        speechLabel.text = "Voice Input"
+        speechLabel.font = UIFont.systemFont(ofSize: 17)
+        
+        let speechSwitch = UISwitch()
+        speechSwitch.isOn = UserSettings.shared.isSpeechRecognitionEnabled
+        speechSwitch.addTarget(self, action: #selector(speechToggleChanged(_:)), for: .valueChanged)
+        
+        let speechHeaderStack = UIStackView(arrangedSubviews: [speechLabel, speechSwitch])
+        speechHeaderStack.axis = .horizontal
+        speechHeaderStack.distribution = .equalSpacing
+        
+        let speechDescription = UILabel()
+        speechDescription.text = "Say letter names (A-Z) or phonetic alphabet (Alpha, Bravo, etc.) to select pigs"
+        speechDescription.font = UIFont.systemFont(ofSize: 14)
+        speechDescription.textColor = .secondaryLabel
+        speechDescription.numberOfLines = 0
+        
+        let speechStackWithDesc = UIStackView(arrangedSubviews: [speechHeaderStack, speechDescription])
+        speechStackWithDesc.axis = .vertical
+        speechStackWithDesc.spacing = 5
         
         // --- Pitch Control ---
         let pitchLabel = UILabel()
@@ -71,7 +94,7 @@ class ConfigurationViewController: UIViewController {
         penaltyValueLabel.text = String(format: "%.1f sec", UserSettings.shared.penaltyDuration)
         penaltyValueLabel.font = UIFont.systemFont(ofSize: 17)
         penaltyValueLabel.textColor = .gray
-        penaltyValueLabel.tag = 888 // Tag for easy lookup
+        penaltyValueLabel.tag = 888
 
         let penaltySlider = UISlider()
         penaltySlider.minimumValue = 0.5
@@ -99,7 +122,7 @@ class ConfigurationViewController: UIViewController {
         penaltyStackWithDesc.spacing = 5
         
         // --- Main Stack ---
-        let mainStack = UIStackView(arrangedSubviews: [learningStackWithDesc, pitchStack, penaltyStackWithDesc])
+        let mainStack = UIStackView(arrangedSubviews: [learningStackWithDesc, speechStackWithDesc, pitchStack, penaltyStackWithDesc])
         mainStack.axis = .vertical
         mainStack.spacing = 30
         mainStack.translatesAutoresizingMaskIntoConstraints = false
@@ -121,9 +144,32 @@ class ConfigurationViewController: UIViewController {
         let stage = segmentIndexToStage(sender.selectedSegmentIndex)
         UserSettings.shared.initialLearningStage = stage
         
-        // Update description text
         if let descriptionLabel = view.viewWithTag(999) as? UILabel {
             descriptionLabel.text = getLevelDescription(for: sender.selectedSegmentIndex)
+        }
+    }
+    
+    @objc private func speechToggleChanged(_ sender: UISwitch) {
+        print("⚙️ Speech toggle changed to: \(sender.isOn)")
+        UserSettings.shared.isSpeechRecognitionEnabled = sender.isOn
+        
+        if sender.isOn {
+            print("⚙️ Requesting speech recognition authorization...")
+            SpeechRecognitionManager.shared.requestAuthorization { [weak self] authorized in
+                print("⚙️ Authorization result: \(authorized)")
+                if !authorized {
+                    let alert = UIAlertController(
+                        title: "Microphone Access Required",
+                        message: "Please enable microphone and speech recognition in Settings to use voice input.",
+                        preferredStyle: .alert
+                    )
+                    alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+                        sender.isOn = false
+                        UserSettings.shared.isSpeechRecognitionEnabled = false
+                    })
+                    self?.present(alert, animated: true)
+                }
+            }
         }
     }
     
@@ -155,19 +201,18 @@ class ConfigurationViewController: UIViewController {
     // MARK: - Helper Methods
     
     private func stageToSegmentIndex(_ stage: Int) -> Int {
-        // Beginner: 2 (E, T, I), Intermediate: 7 (through U), Advanced: 12 (through G)
         switch stage {
-        case 0...2: return 0  // Beginner
-        case 3...7: return 1  // Intermediate
-        default: return 2     // Advanced
+        case 0...2: return 0
+        case 3...7: return 1
+        default: return 2
         }
     }
     
     private func segmentIndexToStage(_ index: Int) -> Int {
         switch index {
-        case 0: return 2   // Beginner: Start with E, T, I
-        case 1: return 7   // Intermediate: Start with E through U
-        case 2: return 12  // Advanced: Start with E through G
+        case 0: return 2
+        case 1: return 7
+        case 2: return 12
         default: return 2
         }
     }

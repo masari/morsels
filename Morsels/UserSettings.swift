@@ -7,10 +7,12 @@ class UserSettings {
     private let pitchKey = "tonePitchFrequency"
     private let learningStageKey = "initialLearningStage"
     private let penaltyDurationKey = "penaltyDuration"
+    private let speechEnabledKey = "isSpeechRecognitionEnabled"
     
     private let defaultPitch = 800.0
     private let defaultLearningStage = 2 // E, T, I
     private let defaultPenaltyDuration = 1.0 // seconds
+    private let defaultSpeechEnabled = false
 
     var tonePitch: Double {
         get {
@@ -23,7 +25,6 @@ class UserSettings {
     
     var initialLearningStage: Int {
         get {
-            // If not set, return default
             if !defaults.bool(forKey: "\(learningStageKey)_isSet") {
                 return defaultLearningStage
             }
@@ -37,12 +38,24 @@ class UserSettings {
     
     var penaltyDuration: TimeInterval {
         get {
-            // If not set or zero, return default
             let saved = defaults.double(forKey: penaltyDurationKey)
             return saved == 0 ? defaultPenaltyDuration : saved
         }
         set {
             defaults.set(newValue, forKey: penaltyDurationKey)
+        }
+    }
+    
+    var isSpeechRecognitionEnabled: Bool {
+        get {
+            if !defaults.bool(forKey: "\(speechEnabledKey)_isSet") {
+                return defaultSpeechEnabled
+            }
+            return defaults.bool(forKey: speechEnabledKey)
+        }
+        set {
+            defaults.set(newValue, forKey: speechEnabledKey)
+            defaults.set(true, forKey: "\(speechEnabledKey)_isSet")
         }
     }
 

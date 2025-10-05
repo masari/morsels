@@ -125,4 +125,17 @@ class MorseCodePlayer {
         }
         player.play()
     }
+    
+    /// Restarts the audio engine if it has stopped
+    /// Restarts the audio engine if it has stopped
+    func restartEngineIfNeeded() {
+        if !engine.isRunning {
+            do {
+                try engine.start()
+                print("🔊 Morse code audio engine restarted")
+            } catch {
+                print("🔊 Failed to restart audio engine: \(error)")
+            }
+        }
+    }
 }
