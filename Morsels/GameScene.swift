@@ -101,7 +101,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
         renderer.setupUI()
         renderer.updateScore(scoreManager.score)
         renderer.updateProgress(progressionManager.progressText)
-        renderer.updateSpeechIndicator(isSpeechEnabled && SpeechRecognitionManager.shared.isListening)
         
         PigTextureGenerator.shared.preloadCommonLetters()
         
@@ -228,7 +227,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
         
         do {
             try SpeechRecognitionManager.shared.startListening()
-            renderer.updateSpeechIndicator(true)
             print("🎮 Speech recognition started successfully from GameScene")
         } catch {
             print("🎮 Failed to start speech recognition: \(error)")
@@ -237,7 +235,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
     
     private func stopSpeechRecognition() {
         SpeechRecognitionManager.shared.stopListening()
-        renderer.updateSpeechIndicator(false)
+        print("🎮 Speech recognition stopped from GameScene")
+
     }
     
     private func evaluateRound() {
@@ -248,8 +247,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
             correctLetters: roundManager.roundLetters
         )
         
-        roundManager.endRound()
-        
+        // Same logic for both voice and tap modes
         if roundManager.hadAnyCorrect {
             let result = scoreManager.calculateRoundScore(
                 correctCount: roundManager.correctInSequence,
@@ -259,6 +257,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
         } else {
             scoreManager.resetStreak()
         }
+        
+        roundManager.endRound()
         
         renderer.updateFailureDisplay(count: roundManager.failedRoundsCount)
         
@@ -294,7 +294,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
         scoreManager.reset()
         progressionManager.reset(to: UserSettings.shared.initialLearningStage)
         roundManager.reset()
-        input.reset()
+        input.reset()  // This will also update voice state from settings
         
         isGameOver = false
         nextRoundScheduled = false
@@ -346,13 +346,13 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
     }
     
     // MARK: - SpeechRecognitionDelegate
+    // MARK: - SpeechRecognitionDelegate
     func didRecognizeLetter(_ letter: Character) {
         print("🎮 GameScene received letter: \(letter)")
         print("🎮 Round active: \(roundManager.isRoundActive)")
-        print("🎮 Penalty active: \(input.isPenaltyActive)")
         
-        guard roundManager.isRoundActive, !input.isPenaltyActive else {
-            print("🎮 Ignoring letter - round not active or penalty active")
+        guard roundManager.isRoundActive else {
+            print("🎮 Ignoring letter - round not active")
             return
         }
         
@@ -366,8 +366,18 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
                pigLetter == letter,
                pig.userData?["isBeingRemoved"] as? Bool != true {
                 print("🎮 Found matching pig with letter \(letter), attempting selection")
-                let wasCorrect = handlePigSelection(letter: letter, sprite: pig)
-                print("🎮 Selection was correct: \(wasCorrect)")
+                
+                // For voice input, handle selection without penalty logic
+                let wasCorrect = roundManager.selectLetter(letter)
+                
+                if wasCorrect {
+                    pig.physicsBody = nil
+                    renderer.removePigWithAnimation(pig)
+                    print("🎮 Selection was correct: \(wasCorrect)")
+                } else {
+                    // For voice input, incorrect selection is just ignored
+                    print("🎮 Selection was incorrect - ignoring (voice input mode)")
+                }
                 break
             }
         }

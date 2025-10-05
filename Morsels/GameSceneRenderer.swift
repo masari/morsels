@@ -15,8 +15,6 @@ class GameSceneRenderer {
         static let progressLabelTopMargin: CGFloat = 20.0
         static let failureIndicatorSpacing: CGFloat = 5.0
         static let failureIndicatorBottomOffset: CGFloat = 20.0
-        static let speechIndicatorBottomMargin: CGFloat = 20.0
-        static let speechIndicatorSize: CGFloat = 40.0
     }
     
     private struct Visual {
@@ -57,14 +55,10 @@ class GameSceneRenderer {
         static let restartLabelYOffset: CGFloat = -0.1
         
         static let gameOverOverlayFadeDuration: TimeInterval = 0.5
-        
-        static let speechIndicatorActiveColor: UIColor = .systemGreen
-        static let speechIndicatorInactiveColor: UIColor = .systemGray
     }
     
     private struct ZPosition {
         static let pigs: CGFloat = 0
-        static let speechIndicator: CGFloat = 5
         static let gameOverOverlay: CGFloat = 10
         static let gameOverLabels: CGFloat = 11
     }
@@ -77,7 +71,6 @@ class GameSceneRenderer {
     private var scoreLabel: SKLabelNode!
     private var progressLabel: SKLabelNode!
     private var failureIndicatorNodes: [SKLabelNode] = []
-    private var speechIndicator: SKLabelNode?
     
     // MARK: - Initialization
     init(worldNode: SKNode, sceneSize: CGSize, safeAreaInsets: UIEdgeInsets) {
@@ -107,21 +100,12 @@ class GameSceneRenderer {
         progressLabel.verticalAlignmentMode = .top
         updateProgressLabelPosition()
         worldNode.addChild(progressLabel)
-        
-        // Speech indicator (microphone emoji)
-        speechIndicator = SKLabelNode(text: "🎤")
-        speechIndicator?.fontSize = Layout.speechIndicatorSize
-        speechIndicator?.zPosition = ZPosition.speechIndicator
-        speechIndicator?.alpha = 0 // Hidden by default
-        updateSpeechIndicatorPosition()
-        worldNode.addChild(speechIndicator!)
     }
     
     func updateSafeAreaInsets(_ insets: UIEdgeInsets) {
         self.safeAreaInsets = insets
         updateScoreLabelPosition()
         updateProgressLabelPosition()
-        updateSpeechIndicatorPosition()
         updateFailureDisplay(count: failureIndicatorNodes.count)
     }
     
@@ -136,13 +120,6 @@ class GameSceneRenderer {
         progressLabel?.position = CGPoint(
             x: Layout.progressLabelLeftMargin + safeAreaInsets.left,
             y: sceneSize.height - Layout.progressLabelTopMargin - safeAreaInsets.top
-        )
-    }
-    
-    private func updateSpeechIndicatorPosition() {
-        speechIndicator?.position = CGPoint(
-            x: sceneSize.width / 2,
-            y: Layout.speechIndicatorBottomMargin + safeAreaInsets.bottom
         )
     }
     
@@ -180,27 +157,6 @@ class GameSceneRenderer {
                 .run { self.progressLabel.fontColor = Visual.progressLabelFontColor }
             ])
             progressLabel.run(celebrateAction)
-        }
-    }
-    
-    // MARK: - Speech Indicator
-    func updateSpeechIndicator(_ isListening: Bool) {
-        guard let indicator = speechIndicator else { return }
-        
-        if isListening {
-            indicator.alpha = 1.0
-            indicator.fontColor = Visual.speechIndicatorActiveColor
-            
-            // Pulse animation
-            let pulse = SKAction.sequence([
-                .scale(to: 1.2, duration: 0.5),
-                .scale(to: 1.0, duration: 0.5)
-            ])
-            indicator.run(SKAction.repeatForever(pulse), withKey: "pulse")
-        } else {
-            indicator.removeAction(forKey: "pulse")
-            indicator.alpha = 0
-            indicator.setScale(1.0)
         }
     }
     

@@ -44,6 +44,7 @@ class ConfigurationViewController: UIViewController {
         
         let speechSwitch = UISwitch()
         speechSwitch.isOn = UserSettings.shared.isSpeechRecognitionEnabled
+        //speechSwitch.isUserInteractionEnabled = false;
         speechSwitch.addTarget(self, action: #selector(speechToggleChanged(_:)), for: .valueChanged)
         
         let speechHeaderStack = UIStackView(arrangedSubviews: [speechLabel, speechSwitch])

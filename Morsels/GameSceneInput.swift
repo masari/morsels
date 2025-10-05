@@ -30,10 +30,17 @@ class GameSceneInput {
     weak var delegate: GameSceneInputDelegate?
     private weak var worldNode: SKNode?
     private(set) var isPenaltyActive = false
+    private var isVoiceInputEnabled = false
     
     // MARK: - Initialization
     init(worldNode: SKNode) {
         self.worldNode = worldNode
+        self.isVoiceInputEnabled = UserSettings.shared.isSpeechRecognitionEnabled
+    }
+    
+    // MARK: - Voice Input State
+    func updateVoiceInputState(_ enabled: Bool) {
+        self.isVoiceInputEnabled = enabled
     }
     
     // MARK: - Touch Handling
@@ -50,6 +57,11 @@ class GameSceneInput {
             if touchedNode.name == "grill" {
                 delegate?.didTapGrill()
                 return true
+            }
+            
+            // Skip pig tapping if voice input is enabled
+            if isVoiceInputEnabled {
+                continue
             }
             
             // Check for pig taps
@@ -123,5 +135,8 @@ class GameSceneInput {
     // MARK: - State Management
     func reset() {
         isPenaltyActive = false
+        isVoiceInputEnabled = UserSettings.shared.isSpeechRecognitionEnabled
     }
+    
+ 
 }
