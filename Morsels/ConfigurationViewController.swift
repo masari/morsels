@@ -149,7 +149,7 @@ class ConfigurationViewController: UIViewController {
           roundDelayStack.spacing = 10
           
           let roundDelayDescription = UILabel()
-          roundDelayDescription.text = "Time between hearing Morse code and pigs appearing"
+          roundDelayDescription.text = "Give player breathing room between rounds"
           roundDelayDescription.font = UIFont.systemFont(ofSize: 14)
           roundDelayDescription.textColor = .secondaryLabel
           roundDelayDescription.numberOfLines = 0
