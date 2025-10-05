@@ -2,14 +2,6 @@
 //  RoundManager.swift
 //  Morsels
 //
-//  Created by Mark Messer on 10/4/25.
-//
-
-
-//
-//  RoundManager.swift
-//  Morsels
-//
 //  Manages round state and failure tracking
 //
 
@@ -74,9 +66,14 @@ class RoundManager {
         }
         
         let expectedLetter = roundLetters[selectedOrder.count]
-        selectedOrder.append(letter)
+        let isCorrect = letter == expectedLetter
         
-        return letter == expectedLetter
+        // Only add to selected order if correct
+        if isCorrect {
+            selectedOrder.append(letter)
+        }
+        
+        return isCorrect
     }
     
     /// Ends the current round and updates failure count

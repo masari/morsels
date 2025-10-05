@@ -62,20 +62,18 @@ class GameSceneInput {
                       pigSprite.userData?["isBeingRemoved"] as? Bool != true
                 else { continue }
                 
-                // Mark as being removed to prevent double-tap
-                pigSprite.userData?["isBeingRemoved"] = true
-                
-                // Ask delegate if this was correct
+                // Ask delegate if this was correct (without marking yet)
                 let wasCorrect = delegate?.didTapPig(letter: tappedLetter, sprite: pigSprite) ?? false
                 
-                if !wasCorrect {
-                    // Incorrect tap - unmark it so penalty can handle it
-                    pigSprite.userData?["isBeingRemoved"] = false
+                if wasCorrect {
+                    // Mark as being removed to prevent double-tap
+                    pigSprite.userData?["isBeingRemoved"] = true
+                    didHandleTouch = true
+                } else {
+                    // Incorrect tap - trigger penalty and don't mark anything
                     triggerPenalty()
                     return true
                 }
-                
-                didHandleTouch = true
             }
         }
         
