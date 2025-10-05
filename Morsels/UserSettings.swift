@@ -8,12 +8,16 @@ class UserSettings {
     private let learningStageKey = "initialLearningStage"
     private let penaltyDurationKey = "penaltyDuration"
     private let speechEnabledKey = "isSpeechRecognitionEnabled"
+    private let roundDelayKey = "delayBetweenRounds"
+    private let preparationTimeKey = "preparationTime"  // ADD THIS
     
     private let defaultPitch = 800.0
-    private let defaultLearningStage = 2 // E, T, I
-    private let defaultPenaltyDuration = 1.0 // seconds
+    private let defaultLearningStage = 2
+    private let defaultPenaltyDuration = 1.0
     private let defaultSpeechEnabled = false
-
+    private let defaultRoundDelay = 2.0  // CHANGED: Time between rounds (not including morse)
+    private let defaultPreparationTime = 2.0  // ADD THIS: Time after morse ends
+    
     var tonePitch: Double {
         get {
             return defaults.double(forKey: pitchKey) == 0 ? defaultPitch : defaults.double(forKey: pitchKey)
@@ -56,6 +60,27 @@ class UserSettings {
         set {
             defaults.set(newValue, forKey: speechEnabledKey)
             defaults.set(true, forKey: "\(speechEnabledKey)_isSet")
+        }
+    }
+    
+    var delayBetweenRounds: TimeInterval {
+        get {
+            let saved = defaults.double(forKey: roundDelayKey)
+            return saved == 0 ? defaultRoundDelay : saved
+        }
+        set {
+            defaults.set(newValue, forKey: roundDelayKey)
+        }
+    }
+    
+    // ADD THIS
+    var preparationTime: TimeInterval {
+        get {
+            let saved = defaults.double(forKey: preparationTimeKey)
+            return saved == 0 ? defaultPreparationTime : saved
+        }
+        set {
+            defaults.set(newValue, forKey: preparationTimeKey)
         }
     }
 

@@ -18,10 +18,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
     }
     
     private struct Timing {
-        static let nextRoundDelay: TimeInterval = 5.0
         static let gameOverDelay: TimeInterval = 1.0
-        static let morseStartMinDelay: TimeInterval = 0.5
-        static let morseEndBuffer: TimeInterval = 0.5
     }
     
     private struct Visual {
@@ -92,6 +89,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
         physics = GameScenePhysics(worldNode: worldNode, sceneSize: size, safeAreaInsets: safeAreaInsets)
         input = GameSceneInput(worldNode: worldNode)
         input.delegate = self
+        input.updateVoiceInputState(isSpeechEnabled)
         
         physicsWorld.contactDelegate = self
         physics.setupPhysicsWorld(for: self)
@@ -191,21 +189,24 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
         roundManager.startRound(with: roundLetters)
         
         let morseDuration = calculateMorseDuration(for: roundLetters)
-        let morseStartDelay = max(
-            Timing.morseStartMinDelay,
-            Timing.nextRoundDelay - morseDuration - Timing.morseEndBuffer
-        )
+        let preparationTime = UserSettings.shared.preparationTime
+        let delayBetweenRounds = UserSettings.shared.delayBetweenRounds
         
+        // When to start the morse code
+        let morseStartDelay = delayBetweenRounds
+        
+        //MTM
         let seq = SKAction.sequence([
             .wait(forDuration: morseStartDelay),
             .run { MorseCodePlayer.shared.play(letters: roundLetters) },
-            .wait(forDuration: Timing.nextRoundDelay - morseStartDelay),
+            .wait(forDuration: morseDuration + preparationTime),
             .run { [weak self] in
                 self?.spawnRoundPigs()
                 self?.startSpeechRecognitionIfEnabled()
                 self?.nextRoundScheduled = false
             }
         ])
+
         run(seq)
     }
     
@@ -235,8 +236,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
     
     private func stopSpeechRecognition() {
         SpeechRecognitionManager.shared.stopListening()
-        print("🎮 Speech recognition stopped from GameScene")
-
     }
     
     private func evaluateRound() {
@@ -294,7 +293,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
         scoreManager.reset()
         progressionManager.reset(to: UserSettings.shared.initialLearningStage)
         roundManager.reset()
-        input.reset()  // This will also update voice state from settings
+        input.reset()
         
         isGameOver = false
         nextRoundScheduled = false
@@ -328,7 +327,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
     }
     
     private func handlePigFlameContact(pigNode: SKSpriteNode, contactPoint: CGPoint) {
-        guard physics.shouldHandlePigFlameContact(pigNode: pigNode, contactPoint: contactPoint) else { return }
+        guard pigNode.parent != nil else { return }
         
         pigNode.physicsBody = nil
         renderer.createSmokeEffect(at: pigNode.position)
@@ -345,7 +344,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
         gameDelegate?.pauseGame()
     }
     
-    // MARK: - SpeechRecognitionDelegate
     // MARK: - SpeechRecognitionDelegate
     func didRecognizeLetter(_ letter: Character) {
         print("🎮 GameScene received letter: \(letter)")
@@ -384,7 +382,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
     }
     
     func speechRecognitionAvailabilityChanged(_ isAvailable: Bool) {
-        // Could show a visual indicator or warning
         print("Speech recognition availability: \(isAvailable)")
     }
     

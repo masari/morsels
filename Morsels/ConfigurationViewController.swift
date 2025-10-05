@@ -122,23 +122,127 @@ class ConfigurationViewController: UIViewController {
         penaltyStackWithDesc.axis = .vertical
         penaltyStackWithDesc.spacing = 5
         
-        // --- Main Stack ---
-        let mainStack = UIStackView(arrangedSubviews: [learningStackWithDesc, speechStackWithDesc, pitchStack, penaltyStackWithDesc])
-        mainStack.axis = .vertical
-        mainStack.spacing = 30
-        mainStack.translatesAutoresizingMaskIntoConstraints = false
-        mainStack.isLayoutMarginsRelativeArrangement = true
-        mainStack.layoutMargins = UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
-        mainStack.backgroundColor = .secondarySystemGroupedBackground
-        mainStack.layer.cornerRadius = 12
+        // --- ADD THIS: Round Delay Control ---
+          let roundDelayLabel = UILabel()
+          roundDelayLabel.text = "Delay Between Rounds"
+          roundDelayLabel.font = UIFont.systemFont(ofSize: 17)
+          
+          let roundDelayValueLabel = UILabel()
+          roundDelayValueLabel.text = String(format: "%.1f sec", UserSettings.shared.delayBetweenRounds)
+          roundDelayValueLabel.font = UIFont.systemFont(ofSize: 17)
+          roundDelayValueLabel.textColor = .gray
+          roundDelayValueLabel.tag = 777
 
-        view.addSubview(mainStack)
+          let roundDelaySlider = UISlider()
+          roundDelaySlider.minimumValue = 2.0
+          roundDelaySlider.maximumValue = 10.0
+          roundDelaySlider.value = Float(UserSettings.shared.delayBetweenRounds)
+          roundDelaySlider.addTarget(self, action: #selector(roundDelaySliderChanged(_:)), for: .valueChanged)
+          roundDelaySlider.addTarget(self, action: #selector(roundDelaySliderDidEndEditing(_:)), for: [.touchUpInside, .touchUpOutside])
+          
+          let roundDelayHeaderStack = UIStackView(arrangedSubviews: [roundDelayLabel, roundDelayValueLabel])
+          roundDelayHeaderStack.axis = .horizontal
+          roundDelayHeaderStack.distribution = .equalSpacing
 
-        NSLayoutConstraint.activate([
-            mainStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-            mainStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            mainStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20)
-        ])
+          let roundDelayStack = UIStackView(arrangedSubviews: [roundDelayHeaderStack, roundDelaySlider])
+          roundDelayStack.axis = .vertical
+          roundDelayStack.spacing = 10
+          
+          let roundDelayDescription = UILabel()
+          roundDelayDescription.text = "Time between hearing Morse code and pigs appearing"
+          roundDelayDescription.font = UIFont.systemFont(ofSize: 14)
+          roundDelayDescription.textColor = .secondaryLabel
+          roundDelayDescription.numberOfLines = 0
+          
+          let roundDelayStackWithDesc = UIStackView(arrangedSubviews: [roundDelayStack, roundDelayDescription])
+          roundDelayStackWithDesc.axis = .vertical
+          roundDelayStackWithDesc.spacing = 5
+          
+        // --- ADD THIS: Preparation Time Control ---
+        let prepTimeLabel = UILabel()
+        prepTimeLabel.text = "Preparation Time"
+        prepTimeLabel.font = UIFont.systemFont(ofSize: 17)
+
+        let prepTimeValueLabel = UILabel()
+        prepTimeValueLabel.text = String(format: "%.1f sec", UserSettings.shared.preparationTime)
+        prepTimeValueLabel.font = UIFont.systemFont(ofSize: 17)
+        prepTimeValueLabel.textColor = .gray
+        prepTimeValueLabel.tag = 666
+
+        let prepTimeSlider = UISlider()
+        prepTimeSlider.minimumValue = 0.5
+        prepTimeSlider.maximumValue = 5.0
+        prepTimeSlider.value = Float(UserSettings.shared.preparationTime)
+        prepTimeSlider.addTarget(self, action: #selector(prepTimeSliderChanged(_:)), for: .valueChanged)
+        prepTimeSlider.addTarget(self, action: #selector(prepTimeSliderDidEndEditing(_:)), for: [.touchUpInside, .touchUpOutside])
+
+        let prepTimeHeaderStack = UIStackView(arrangedSubviews: [prepTimeLabel, prepTimeValueLabel])
+        prepTimeHeaderStack.axis = .horizontal
+        prepTimeHeaderStack.distribution = .equalSpacing
+
+        let prepTimeStack = UIStackView(arrangedSubviews: [prepTimeHeaderStack, prepTimeSlider])
+        prepTimeStack.axis = .vertical
+        prepTimeStack.spacing = 10
+
+        let prepTimeDescription = UILabel()
+        prepTimeDescription.text = "Time between hearing Morse code and pigs appearing"
+        prepTimeDescription.font = UIFont.systemFont(ofSize: 14)
+        prepTimeDescription.textColor = .secondaryLabel
+        prepTimeDescription.numberOfLines = 0
+
+        let prepTimeStackWithDesc = UIStackView(arrangedSubviews: [prepTimeStack, prepTimeDescription])
+        prepTimeStackWithDesc.axis = .vertical
+        prepTimeStackWithDesc.spacing = 5
+        
+          // --- Main Stack ---
+          let mainStack = UIStackView(arrangedSubviews: [
+              learningStackWithDesc,
+              speechStackWithDesc,
+              pitchStack,
+              penaltyStackWithDesc,
+              roundDelayStackWithDesc, // ADD THIS
+              prepTimeStackWithDesc  // ADD THIS
+          ])
+          mainStack.axis = .vertical
+          mainStack.spacing = 30
+          mainStack.translatesAutoresizingMaskIntoConstraints = false
+          mainStack.isLayoutMarginsRelativeArrangement = true
+          mainStack.layoutMargins = UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+          mainStack.backgroundColor = .secondarySystemGroupedBackground
+          mainStack.layer.cornerRadius = 12
+
+          view.addSubview(mainStack)
+
+          NSLayoutConstraint.activate([
+              mainStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
+              mainStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+              mainStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20)
+          ])
+      }
+
+      // ADD THESE METHODS:
+      @objc private func roundDelaySliderChanged(_ sender: UISlider) {
+          if let roundDelayValueLabel = view.viewWithTag(777) as? UILabel {
+              let value = sender.value
+              roundDelayValueLabel.text = String(format: "%.1f sec", value)
+          }
+      }
+
+      @objc private func roundDelaySliderDidEndEditing(_ sender: UISlider) {
+          let newDelay = TimeInterval(sender.value)
+          UserSettings.shared.delayBetweenRounds = newDelay
+      }
+    
+    @objc private func prepTimeSliderChanged(_ sender: UISlider) {
+        if let prepTimeValueLabel = view.viewWithTag(666) as? UILabel {
+            let value = sender.value
+            prepTimeValueLabel.text = String(format: "%.1f sec", value)
+        }
+    }
+
+    @objc private func prepTimeSliderDidEndEditing(_ sender: UISlider) {
+        let newTime = TimeInterval(sender.value)
+        UserSettings.shared.preparationTime = newTime
     }
     
     @objc private func learningLevelChanged(_ sender: UISegmentedControl) {
