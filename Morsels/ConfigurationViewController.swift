@@ -194,15 +194,90 @@ class ConfigurationViewController: UIViewController {
         prepTimeStackWithDesc.axis = .vertical
         prepTimeStackWithDesc.spacing = 5
         
-          // --- Main Stack ---
-          let mainStack = UIStackView(arrangedSubviews: [
-              learningStackWithDesc,
-              speechStackWithDesc,
-              pitchStack,
-              penaltyStackWithDesc,
-              roundDelayStackWithDesc, // ADD THIS
-              prepTimeStackWithDesc  // ADD THIS
-          ])
+        // --- Character Speed Control ---
+        let charSpeedLabel = UILabel()
+        charSpeedLabel.text = "Character Speed"
+        charSpeedLabel.font = UIFont.systemFont(ofSize: 17)
+
+        let charSpeedValueLabel = UILabel()
+        charSpeedValueLabel.text = "\(Int(UserSettings.shared.morseCharacterSpeed)) WPM"
+        charSpeedValueLabel.font = UIFont.systemFont(ofSize: 17)
+        charSpeedValueLabel.textColor = .gray
+        charSpeedValueLabel.tag = 555
+
+        let charSpeedSlider = UISlider()
+        charSpeedSlider.minimumValue = 5
+        charSpeedSlider.maximumValue = 40
+        charSpeedSlider.value = Float(UserSettings.shared.morseCharacterSpeed)
+        charSpeedSlider.addTarget(self, action: #selector(charSpeedSliderChanged(_:)), for: .valueChanged)
+        charSpeedSlider.addTarget(self, action: #selector(charSpeedSliderDidEndEditing(_:)), for: [.touchUpInside, .touchUpOutside])
+
+        let charSpeedHeaderStack = UIStackView(arrangedSubviews: [charSpeedLabel, charSpeedValueLabel])
+        charSpeedHeaderStack.axis = .horizontal
+        charSpeedHeaderStack.distribution = .equalSpacing
+
+        let charSpeedStack = UIStackView(arrangedSubviews: [charSpeedHeaderStack, charSpeedSlider])
+        charSpeedStack.axis = .vertical
+        charSpeedStack.spacing = 10
+
+        let charSpeedDescription = UILabel()
+        charSpeedDescription.text = "How fast individual characters are sent (words per minute)"
+        charSpeedDescription.font = UIFont.systemFont(ofSize: 14)
+        charSpeedDescription.textColor = .secondaryLabel
+        charSpeedDescription.numberOfLines = 0
+
+        let charSpeedStackWithDesc = UIStackView(arrangedSubviews: [charSpeedStack, charSpeedDescription])
+        charSpeedStackWithDesc.axis = .vertical
+        charSpeedStackWithDesc.spacing = 5
+
+        // --- Farnsworth Spacing Control ---
+        let farnsworthLabel = UILabel()
+        farnsworthLabel.text = "Letter Spacing"
+        farnsworthLabel.font = UIFont.systemFont(ofSize: 17)
+
+        let farnsworthValueLabel = UILabel()
+        farnsworthValueLabel.text = "\(Int(UserSettings.shared.morseFarnsworthSpacing)) WPM"
+        farnsworthValueLabel.font = UIFont.systemFont(ofSize: 17)
+        farnsworthValueLabel.textColor = .gray
+        farnsworthValueLabel.tag = 444
+
+        let farnsworthSlider = UISlider()
+        farnsworthSlider.minimumValue = 5
+        farnsworthSlider.maximumValue = 40
+        farnsworthSlider.value = Float(UserSettings.shared.morseFarnsworthSpacing)
+        farnsworthSlider.addTarget(self, action: #selector(farnsworthSliderChanged(_:)), for: .valueChanged)
+        farnsworthSlider.addTarget(self, action: #selector(farnsworthSliderDidEndEditing(_:)), for: [.touchUpInside, .touchUpOutside])
+
+        let farnsworthHeaderStack = UIStackView(arrangedSubviews: [farnsworthLabel, farnsworthValueLabel])
+        farnsworthHeaderStack.axis = .horizontal
+        farnsworthHeaderStack.distribution = .equalSpacing
+
+        let farnsworthStack = UIStackView(arrangedSubviews: [farnsworthHeaderStack, farnsworthSlider])
+        farnsworthStack.axis = .vertical
+        farnsworthStack.spacing = 10
+
+        let farnsworthDescription = UILabel()
+        farnsworthDescription.text = "Slower spacing gives more time to think between letters"
+        farnsworthDescription.font = UIFont.systemFont(ofSize: 14)
+        farnsworthDescription.textColor = .secondaryLabel
+        farnsworthDescription.numberOfLines = 0
+
+        let farnsworthStackWithDesc = UIStackView(arrangedSubviews: [farnsworthStack, farnsworthDescription])
+        farnsworthStackWithDesc.axis = .vertical
+        farnsworthStackWithDesc.spacing = 5
+
+        // Update main stack to include new controls
+        let mainStack = UIStackView(arrangedSubviews: [
+            learningStackWithDesc,
+            speechStackWithDesc,
+            pitchStack,
+            charSpeedStackWithDesc,  // ADD
+            farnsworthStackWithDesc,  // ADD
+            penaltyStackWithDesc,
+            roundDelayStackWithDesc,
+            prepTimeStackWithDesc
+        ])
+        
           mainStack.axis = .vertical
           mainStack.spacing = 30
           mainStack.translatesAutoresizingMaskIntoConstraints = false
@@ -303,6 +378,31 @@ class ConfigurationViewController: UIViewController {
         UserSettings.shared.penaltyDuration = newDuration
     }
     
+    @objc private func charSpeedSliderChanged(_ sender: UISlider) {
+        if let valueLabel = view.viewWithTag(555) as? UILabel {
+            let value = Int(sender.value)
+            valueLabel.text = "\(value) WPM"
+        }
+    }
+
+    @objc private func charSpeedSliderDidEndEditing(_ sender: UISlider) {
+        let newSpeed = Double(sender.value)
+        UserSettings.shared.morseCharacterSpeed = newSpeed
+        MorseCodePlayer.shared.updateCharacterSpeed(newSpeed)
+    }
+
+    @objc private func farnsworthSliderChanged(_ sender: UISlider) {
+        if let valueLabel = view.viewWithTag(444) as? UILabel {
+            let value = Int(sender.value)
+            valueLabel.text = "\(value) WPM"
+        }
+    }
+
+    @objc private func farnsworthSliderDidEndEditing(_ sender: UISlider) {
+        let newSpacing = Double(sender.value)
+        UserSettings.shared.morseFarnsworthSpacing = newSpacing
+        MorseCodePlayer.shared.updateFarnsworthSpacing(newSpacing)
+    }
     // MARK: - Helper Methods
     
     private func stageToSegmentIndex(_ stage: Int) -> Int {

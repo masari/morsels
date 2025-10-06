@@ -18,12 +18,16 @@ class MorseCodePlayer {
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
     private let sampleRate: Double = 44_100
-    private var toneFrequency: Double = 800  // Hz. Changed to var
+    private var toneFrequency: Double = 800
 
+    // Timing properties
+    private var characterSpeed: Double = 20.0  // WPM
+    private var farnsworthSpacing: Double = 15.0  // Effective WPM
+    
     private var dotBuffer: AVAudioPCMBuffer
     private var dashBuffer: AVAudioPCMBuffer
-    private let symbolGapBuffer: AVAudioPCMBuffer
-    private let letterGapBuffer: AVAudioPCMBuffer
+    private var symbolGapBuffer: AVAudioPCMBuffer
+    private var letterGapBuffer: AVAudioPCMBuffer
 
     private init() {
         // Configure audio session first
@@ -40,23 +44,57 @@ class MorseCodePlayer {
         let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
         engine.connect(player, to: engine.mainMixerNode, format: format)
 
-        // Load saved frequency or use default
+        // Load saved settings
         self.toneFrequency = UserSettings.shared.tonePitch
+        self.characterSpeed = UserSettings.shared.morseCharacterSpeed
+        self.farnsworthSpacing = UserSettings.shared.morseFarnsworthSpacing
         
-        // Pre‐generate buffers
-        dotBuffer      = MorseCodePlayer.makeToneBuffer(duration: 0.1, sampleRate: sampleRate, freq: toneFrequency)
-        dashBuffer     = MorseCodePlayer.makeToneBuffer(duration: 0.3, sampleRate: sampleRate, freq: toneFrequency)
-        symbolGapBuffer = MorseCodePlayer.makeSilenceBuffer(duration: 0.1, sampleRate: sampleRate)
-        letterGapBuffer = MorseCodePlayer.makeSilenceBuffer(duration: 0.3, sampleRate: sampleRate)
+        // Generate buffers with current timing
+        (dotBuffer, dashBuffer, symbolGapBuffer, letterGapBuffer) = Self.generateBuffers(
+            sampleRate: sampleRate,
+            frequency: toneFrequency,
+            characterSpeed: characterSpeed,
+            farnsworthSpacing: farnsworthSpacing
+        )
 
         // Start engine
-        do { 
-            try engine.start() 
-            print("Audio engine started successfully")
+        do {
+            try engine.start()
+            print("🔊 Morse code audio engine started successfully")
         }
-        catch { 
-            print("Audio engine start error:", error) 
+        catch {
+            print("❌ Morse code audio engine start error:", error)
         }
+    }
+
+    /// Calculate timing based on WPM (Words Per Minute)
+    /// Standard word is "PARIS" which is 50 dot units
+    private static func calculateTiming(characterSpeed: Double, farnsworthSpacing: Double) -> (dot: Double, dash: Double, symbolGap: Double, letterGap: Double) {
+        // Character speed determines dit/dah length
+        let dotDuration = 1.2 / characterSpeed  // PARIS standard
+        let dashDuration = dotDuration * 3
+        let symbolGap = dotDuration  // Between dits/dahs in a character
+        
+        // Farnsworth spacing: stretch the gaps between characters
+        // If farnsworth < character speed, use character speed (no stretching)
+        let effectiveSpacing = min(farnsworthSpacing, characterSpeed)
+        let stretchFactor = characterSpeed / effectiveSpacing
+        let letterGap = dotDuration * 3 * stretchFactor  // Between characters
+        
+        return (dotDuration, dashDuration, symbolGap, letterGap)
+    }
+
+    /// Generate all timing buffers
+    private static func generateBuffers(sampleRate: Double, frequency: Double, characterSpeed: Double, farnsworthSpacing: Double) -> (dot: AVAudioPCMBuffer, dash: AVAudioPCMBuffer, symbolGap: AVAudioPCMBuffer, letterGap: AVAudioPCMBuffer) {
+        
+        let timing = calculateTiming(characterSpeed: characterSpeed, farnsworthSpacing: farnsworthSpacing)
+        
+        let dot = makeToneBuffer(duration: timing.dot, sampleRate: sampleRate, freq: frequency)
+        let dash = makeToneBuffer(duration: timing.dash, sampleRate: sampleRate, freq: frequency)
+        let symbolGap = makeSilenceBuffer(duration: timing.symbolGap, sampleRate: sampleRate)
+        let letterGap = makeSilenceBuffer(duration: timing.letterGap, sampleRate: sampleRate)
+        
+        return (dot, dash, symbolGap, letterGap)
     }
 
     /// Generate sine‐wave buffer
@@ -89,9 +127,30 @@ class MorseCodePlayer {
     /// Updates the tone frequency and regenerates the audio buffers.
     func updateToneFrequency(_ newFrequency: Double) {
         self.toneFrequency = newFrequency
-        self.dotBuffer = MorseCodePlayer.makeToneBuffer(duration: 0.1, sampleRate: self.sampleRate, freq: self.toneFrequency)
-        self.dashBuffer = MorseCodePlayer.makeToneBuffer(duration: 0.3, sampleRate: self.sampleRate, freq: self.toneFrequency)
-        print("Morse code tone frequency updated to \(newFrequency) Hz")
+        regenerateBuffers()
+    }
+    
+    /// Updates character speed (WPM) and regenerates buffers
+    func updateCharacterSpeed(_ newSpeed: Double) {
+        self.characterSpeed = newSpeed
+        regenerateBuffers()
+    }
+    
+    /// Updates Farnsworth spacing and regenerates buffers
+    func updateFarnsworthSpacing(_ newSpacing: Double) {
+        self.farnsworthSpacing = newSpacing
+        regenerateBuffers()
+    }
+    
+    /// Regenerate all buffers with current settings
+    private func regenerateBuffers() {
+        (dotBuffer, dashBuffer, symbolGapBuffer, letterGapBuffer) = Self.generateBuffers(
+            sampleRate: sampleRate,
+            frequency: toneFrequency,
+            characterSpeed: characterSpeed,
+            farnsworthSpacing: farnsworthSpacing
+        )
+        print("🔊 Morse buffers regenerated - Speed: \(characterSpeed) WPM, Farnsworth: \(farnsworthSpacing) WPM, Freq: \(toneFrequency) Hz")
     }
 
     /// Play given letters as Morse code beeps.
@@ -111,7 +170,7 @@ class MorseCodePlayer {
 
         // Debug: Print what we're about to play
         let letterString = letters.map(String.init).joined()
-        print("Playing Morse code for: \(letterString)")
+        print("🔊 Playing Morse code for: \(letterString)")
 
         // Schedule sequentially
         var time: AVAudioTime? = nil
@@ -126,7 +185,6 @@ class MorseCodePlayer {
         player.play()
     }
     
-    /// Restarts the audio engine if it has stopped
     /// Restarts the audio engine if it has stopped
     func restartEngineIfNeeded() {
         if !engine.isRunning {

@@ -9,14 +9,18 @@ class UserSettings {
     private let penaltyDurationKey = "penaltyDuration"
     private let speechEnabledKey = "isSpeechRecognitionEnabled"
     private let roundDelayKey = "delayBetweenRounds"
-    private let preparationTimeKey = "preparationTime"  // ADD THIS
+    private let preparationTimeKey = "preparationTime"
+    private let characterSpeedKey = "morseCharacterSpeed"  // NEW
+    private let farnsworthSpacingKey = "morseFarnsworthSpacing"  // NEW
     
     private let defaultPitch = 800.0
     private let defaultLearningStage = 2
     private let defaultPenaltyDuration = 1.0
     private let defaultSpeechEnabled = false
-    private let defaultRoundDelay = 2.0  // CHANGED: Time between rounds (not including morse)
-    private let defaultPreparationTime = 2.0  // ADD THIS: Time after morse ends
+    private let defaultRoundDelay = 2.0
+    private let defaultPreparationTime = 2.0
+    private let defaultCharacterSpeed = 20.0  // NEW: Words per minute (WPM)
+    private let defaultFarnsworthSpacing = 15.0  // NEW: Effective WPM for spacing
     
     var tonePitch: Double {
         get {
@@ -73,7 +77,6 @@ class UserSettings {
         }
     }
     
-    // ADD THIS
     var preparationTime: TimeInterval {
         get {
             let saved = defaults.double(forKey: preparationTimeKey)
@@ -81,6 +84,28 @@ class UserSettings {
         }
         set {
             defaults.set(newValue, forKey: preparationTimeKey)
+        }
+    }
+    
+    // NEW: Character speed in WPM
+    var morseCharacterSpeed: Double {
+        get {
+            let saved = defaults.double(forKey: characterSpeedKey)
+            return saved == 0 ? defaultCharacterSpeed : saved
+        }
+        set {
+            defaults.set(newValue, forKey: characterSpeedKey)
+        }
+    }
+    
+    // NEW: Farnsworth spacing in effective WPM
+    var morseFarnsworthSpacing: Double {
+        get {
+            let saved = defaults.double(forKey: farnsworthSpacingKey)
+            return saved == 0 ? defaultFarnsworthSpacing : saved
+        }
+        set {
+            defaults.set(newValue, forKey: farnsworthSpacingKey)
         }
     }
 

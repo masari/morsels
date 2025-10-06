@@ -329,6 +329,13 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
     private func handlePigFlameContact(pigNode: SKSpriteNode, contactPoint: CGPoint) {
         guard pigNode.parent != nil else { return }
         
+        // Only burn pigs that are actually low on screen
+        // If pig is in top 50% of screen, ignore the contact
+        if pigNode.position.y > size.height * 0.5 {
+            print("🐷 Ignoring high contact at y: \(pigNode.position.y)")
+            return
+        }
+        
         pigNode.physicsBody = nil
         renderer.createSmokeEffect(at: pigNode.position)
         pigNode.removeFromParent()
@@ -424,16 +431,43 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
     }
     
     // MARK: - Helper Methods
+//    private func calculateMorseDuration(for letters: [Character]) -> TimeInterval {
+//        let dot = 0.1, dash = 0.3, intra = dot, inter = dot * 3
+//        var duration: TimeInterval = 0
+//        for (i, ch) in letters.enumerated() {
+//            guard let code = MorseCodePlayer.shared.mapping[ch] else { continue }
+//            for symbol in code {
+//                duration += (symbol == "." ? dot : dash) + intra
+//            }
+//            if i < letters.count - 1 { duration += inter }
+//        }
+//        return duration
+//    }
+    
+    // In GameScene.swift - calculateMorseDuration method
     private func calculateMorseDuration(for letters: [Character]) -> TimeInterval {
-        let dot = 0.1, dash = 0.3, intra = dot, inter = dot * 3
+        let characterSpeed = UserSettings.shared.morseCharacterSpeed
+        let farnsworthSpacing = UserSettings.shared.morseFarnsworthSpacing
+        
+        // Calculate timing (same formula as MorseCodePlayer)
+        let dotDuration = 1.2 / characterSpeed
+        let symbolGap = dotDuration
+        let effectiveSpacing = min(farnsworthSpacing, characterSpeed)
+        let stretchFactor = characterSpeed / effectiveSpacing
+        let letterGap = dotDuration * 3 * stretchFactor
+        
         var duration: TimeInterval = 0
         for (i, ch) in letters.enumerated() {
             guard let code = MorseCodePlayer.shared.mapping[ch] else { continue }
             for symbol in code {
-                duration += (symbol == "." ? dot : dash) + intra
+                let elementDuration = symbol == "." ? dotDuration : (dotDuration * 3)
+                duration += elementDuration + symbolGap
             }
-            if i < letters.count - 1 { duration += inter }
+            if i < letters.count - 1 {
+                duration += letterGap
+            }
         }
         return duration
     }
+    
 }
