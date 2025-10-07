@@ -55,8 +55,17 @@ class GameSceneInput {
             // Check for grill tap first (only foreground, not flames)
             let touchedNode = worldNode.atPoint(location)
             if touchedNode.name == "grill" {
-                delegate?.didTapGrill()
-                return true
+                // Only trigger pause if tapping the bottom portion (below 50% of grill height)
+                if let grillSprite = touchedNode as? SKSpriteNode {
+                    let localY = location.y - grillSprite.position.y
+                    //let grillHalfHeight = grillSprite.size.height / 2
+                    
+                    // Only pause if tapping bottom half of grill (the solid part)
+                    if localY < 0 {  // Below center of grill sprite
+                        delegate?.didTapGrill()
+                        return true
+                    }
+                }
             }
             
             // Skip pig tapping if voice input is enabled

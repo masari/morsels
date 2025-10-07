@@ -282,8 +282,11 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
             .run { [weak self] in
                 guard let self = self else { return }
                 self.renderer.showGameOver(finalScore: self.scoreManager.score)
-                GameKitHelper.shared.submitScore(self.scoreManager.score, leaderboardID: GameKitHelper.leaderboardID)
-            }
+                
+                // Only submit to leaderboard in Expert mode
+                if UserSettings.shared.isExpertMode {
+                    GameKitHelper.shared.submitScore(self.scoreManager.score, leaderboardID: GameKitHelper.leaderboardID)
+                }            }
         ]))
     }
     

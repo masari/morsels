@@ -12,6 +12,12 @@ class ConfigurationViewController: UIViewController {
         title = "Configuration"
         navigationController?.navigationBar.prefersLargeTitles = true
 
+        // CREATE SCROLL VIEW
+        let scrollView = UIScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.isScrollEnabled = true  // Add this
+        view.addSubview(scrollView)
+        
         // --- Learning Level Selection ---
         let learningLabel = UILabel()
         learningLabel.text = "Starting Level"
@@ -30,9 +36,10 @@ class ConfigurationViewController: UIViewController {
         learningDescription.text = getLevelDescription(for: learningSegmentedControl.selectedSegmentIndex)
         learningDescription.font = UIFont.systemFont(ofSize: 14)
         learningDescription.textColor = .secondaryLabel
-        learningDescription.numberOfLines = 0
+        learningDescription.numberOfLines = 3
         learningDescription.tag = 999
-        
+        learningDescription.heightAnchor.constraint(equalToConstant: 60).isActive = true
+
         let learningStackWithDesc = UIStackView(arrangedSubviews: [learningStack, learningDescription])
         learningStackWithDesc.axis = .vertical
         learningStackWithDesc.spacing = 5
@@ -266,6 +273,44 @@ class ConfigurationViewController: UIViewController {
         farnsworthStackWithDesc.axis = .vertical
         farnsworthStackWithDesc.spacing = 5
 
+        // --- Gravity Control ---
+        let gravityLabel = UILabel()
+        gravityLabel.text = "Pig Falling Speed"
+        gravityLabel.font = UIFont.systemFont(ofSize: 17)
+
+        let gravityValueLabel = UILabel()
+        gravityValueLabel.text = String(format: "%.2f", UserSettings.shared.pigGravity)
+        gravityValueLabel.font = UIFont.systemFont(ofSize: 17)
+        gravityValueLabel.textColor = .gray
+        gravityValueLabel.tag = 333
+
+        let gravitySlider = UISlider()
+        gravitySlider.minimumValue = 0.2
+        gravitySlider.maximumValue = 0.8
+        gravitySlider.value = Float(UserSettings.shared.pigGravity)
+        gravitySlider.addTarget(self, action: #selector(gravitySliderChanged(_:)), for: .valueChanged)
+        gravitySlider.addTarget(self, action: #selector(gravitySliderDidEndEditing(_:)), for: [.touchUpInside, .touchUpOutside])
+
+        let gravityHeaderStack = UIStackView(arrangedSubviews: [gravityLabel, gravityValueLabel])
+        gravityHeaderStack.axis = .horizontal
+        gravityHeaderStack.distribution = .equalSpacing
+
+        let gravityStack = UIStackView(arrangedSubviews: [gravityHeaderStack, gravitySlider])
+        gravityStack.axis = .vertical
+        gravityStack.spacing = 10
+
+        let gravityDescription = UILabel()
+        gravityDescription.text = "How quickly pigs fall toward the grill"
+        gravityDescription.font = UIFont.systemFont(ofSize: 14)
+        gravityDescription.textColor = .secondaryLabel
+        gravityDescription.numberOfLines = 0
+
+        let gravityStackWithDesc = UIStackView(arrangedSubviews: [gravityStack, gravityDescription])
+        gravityStackWithDesc.axis = .vertical
+        gravityStackWithDesc.spacing = 5
+
+        // Add gravityStackWithDesc to your mainStack array
+        
         // Update main stack to include new controls
         let mainStack = UIStackView(arrangedSubviews: [
             learningStackWithDesc,
@@ -275,24 +320,36 @@ class ConfigurationViewController: UIViewController {
             farnsworthStackWithDesc,  // ADD
             penaltyStackWithDesc,
             roundDelayStackWithDesc,
-            prepTimeStackWithDesc
+            prepTimeStackWithDesc,
+            gravityStackWithDesc
         ])
         
           mainStack.axis = .vertical
-          mainStack.spacing = 30
+          mainStack.spacing = 50 //TEMP WAS 30
           mainStack.translatesAutoresizingMaskIntoConstraints = false
           mainStack.isLayoutMarginsRelativeArrangement = true
           mainStack.layoutMargins = UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
           mainStack.backgroundColor = .secondarySystemGroupedBackground
           mainStack.layer.cornerRadius = 12
 
-          view.addSubview(mainStack)
-
-          NSLayoutConstraint.activate([
-              mainStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-              mainStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-              mainStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20)
-          ])
+        scrollView.addSubview(mainStack)  // NEW - add to scrollView instead
+        
+        NSLayoutConstraint.activate([
+            // Scroll view fills the screen
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 1),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            
+            // Stack inside scroll view - pin all 4 edges
+            mainStack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 20),
+            mainStack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: 20),
+            mainStack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -20),
+            mainStack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -20),
+            
+            // Width constraint - use frameLayoutGuide instead
+            mainStack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -40)
+        ])
       }
 
       // ADD THESE METHODS:
@@ -322,12 +379,13 @@ class ConfigurationViewController: UIViewController {
     
     @objc private func learningLevelChanged(_ sender: UISegmentedControl) {
         let stage = segmentIndexToStage(sender.selectedSegmentIndex)
-        UserSettings.shared.initialLearningStage = stage
+       UserSettings.shared.initialLearningStage = stage
         
         if let descriptionLabel = view.viewWithTag(999) as? UILabel {
             descriptionLabel.text = getLevelDescription(for: sender.selectedSegmentIndex)
         }
     }
+   
     
     @objc private func speechToggleChanged(_ sender: UISwitch) {
         print("⚙️ Speech toggle changed to: \(sender.isOn)")
@@ -402,6 +460,18 @@ class ConfigurationViewController: UIViewController {
         let newSpacing = Double(sender.value)
         UserSettings.shared.morseFarnsworthSpacing = newSpacing
         MorseCodePlayer.shared.updateFarnsworthSpacing(newSpacing)
+    }
+    
+    @objc private func gravitySliderChanged(_ sender: UISlider) {
+        if let gravityValueLabel = view.viewWithTag(333) as? UILabel {
+            let value = sender.value
+            gravityValueLabel.text = String(format: "%.2f", value)
+        }
+    }
+
+    @objc private func gravitySliderDidEndEditing(_ sender: UISlider) {
+        let newGravity = CGFloat(sender.value)
+        UserSettings.shared.pigGravity = newGravity
     }
     // MARK: - Helper Methods
     

@@ -12,7 +12,8 @@ class UserSettings {
     private let preparationTimeKey = "preparationTime"
     private let characterSpeedKey = "morseCharacterSpeed"  // NEW
     private let farnsworthSpacingKey = "morseFarnsworthSpacing"  // NEW
-    
+    private let pigGravityKey = "pigGravity"
+
     private let defaultPitch = 800.0
     private let defaultLearningStage = 2
     private let defaultPenaltyDuration = 1.0
@@ -21,7 +22,8 @@ class UserSettings {
     private let defaultPreparationTime = 2.0
     private let defaultCharacterSpeed = 20.0  // NEW: Words per minute (WPM)
     private let defaultFarnsworthSpacing = 15.0  // NEW: Effective WPM for spacing
-    
+    private let defaultPigGravity = 0.4
+
     var tonePitch: Double {
         get {
             return defaults.double(forKey: pitchKey) == 0 ? defaultPitch : defaults.double(forKey: pitchKey)
@@ -109,5 +111,21 @@ class UserSettings {
         }
     }
 
+    var pigGravity: CGFloat {
+        get {
+            let saved = defaults.double(forKey: pigGravityKey)
+            return saved == 0 ? CGFloat(defaultPigGravity) : CGFloat(saved)
+        }
+        set {
+            defaults.set(Double(newValue), forKey: pigGravityKey)
+        }
+    }
+    
+    // In UserSettings.swift
+    var isExpertMode: Bool {
+        get { defaults.bool(forKey: "isExpertMode") }
+        set { defaults.set(newValue, forKey: "isExpertMode") }
+    }
+    
     private init() {}
 }

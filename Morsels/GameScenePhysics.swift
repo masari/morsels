@@ -70,8 +70,8 @@ class GameScenePhysics {
     
     // MARK: - Physics World Setup
     func setupPhysicsWorld(for scene: SKScene) {
-        scene.physicsWorld.gravity = Physics.gravity
-        
+        scene.physicsWorld.gravity = CGVector(dx: 0, dy: -UserSettings.shared.pigGravity)
+
         let borderPath = CGMutablePath()
         borderPath.move(to: CGPoint(x: 0, y: 0))
         borderPath.addLine(to: CGPoint(x: 0, y: sceneSize.height))
