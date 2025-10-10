@@ -93,6 +93,16 @@ class SpeechRecognitionManager: NSObject {
     func startListening() throws {
         print("🎤 startListening() called")
         
+        guard isAuthorized else {
+            print("🎤 Not authorized to start listening")
+            throw SpeechRecognitionError.notAuthorized
+        }
+        
+        // Stop if already listening
+        if isListening {
+            stopListening()
+        }
+        
         // Reset last processed transcription
         lastProcessedTranscription = ""
         
@@ -102,16 +112,15 @@ class SpeechRecognitionManager: NSObject {
             recognitionTask = nil
         }
         
-        // Stop audio engine if running
-        if audioEngine.isRunning {
-            audioEngine.stop()
-            audioEngine.inputNode.removeTap(onBus: 0)
-        }
-        
-        // Configure audio session
+        // Configure audio session for recording
         let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
-        try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        do {
+            try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("🎤 Audio session error: \(error)")
+            throw error
+        }
         
         // Create recognition request
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
@@ -124,6 +133,9 @@ class SpeechRecognitionManager: NSObject {
         // Get audio input node
         let inputNode = audioEngine.inputNode
         
+        // Remove any existing taps
+        inputNode.removeTap(onBus: 0)
+        
         // Create recognition task
         recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
             guard let self = self else { return }
@@ -135,17 +147,13 @@ class SpeechRecognitionManager: NSObject {
             
             if let error = error {
                 print("🎤 Recognition error: \(error.localizedDescription)")
-                // Don't stop on errors, let it continue listening
             }
-            
-            // Only stop if explicitly requested, not on final results
-            // The round manager will call stopListening when the round ends
         }
         
         // Configure audio tap
         let recordingFormat = inputNode.outputFormat(forBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak recognitionRequest] buffer, _ in
-            recognitionRequest?.append(buffer)
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
+            self?.recognitionRequest?.append(buffer)
         }
         
         // Start audio engine
@@ -157,7 +165,10 @@ class SpeechRecognitionManager: NSObject {
     }
     
     func stopListening() {
-        guard isListening else { return }
+        guard isListening else {
+            print("🎤 stopListening() called but not listening")
+            return
+        }
         
         print("🎤 stopListening() called")
         isListening = false
@@ -177,11 +188,14 @@ class SpeechRecognitionManager: NSObject {
         
         // Reset audio session to playback mode for Morse code
         let audioSession = AVAudioSession.sharedInstance()
-        try? audioSession.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-        try? audioSession.setActive(true)
+        do {
+            try audioSession.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("🎤 Error resetting audio session: \(error)")
+        }
         
         // CRITICAL: Restart the Morse code audio engine after switching audio sessions
-        // The MorseCodePlayer engine gets stopped when we change audio categories
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             MorseCodePlayer.shared.restartEngineIfNeeded()
         }

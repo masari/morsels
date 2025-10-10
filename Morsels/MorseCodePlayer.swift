@@ -47,7 +47,7 @@ class MorseCodePlayer {
         // Load saved settings
         self.toneFrequency = UserSettings.shared.tonePitch
         self.characterSpeed = UserSettings.shared.morseCharacterSpeed
-        self.farnsworthSpacing = UserSettings.shared.morseFarnsworthSpacing
+        self.farnsworthSpacing = UserSettings.shared.morseFarnsworthSpeed
         
         // Generate buffers with current timing
         (dotBuffer, dashBuffer, symbolGapBuffer, letterGapBuffer) = Self.generateBuffers(

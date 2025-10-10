@@ -29,9 +29,22 @@
 		F9B013582E8899B800130A4A /* MorselsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MorselsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		F9597B352E9879C90091C416 /* Exceptions for "Morsels" folder in "Morsels" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = F9B013342E8899B600130A4A /* Morsels */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		F9B013372E8899B600130A4A /* Morsels */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F9597B352E9879C90091C416 /* Exceptions for "Morsels" folder in "Morsels" target */,
+			);
 			path = Morsels;
 			sourceTree = "<group>";
 		};
@@ -395,11 +408,12 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Morsels/Morsels.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = LGQJKP2RML;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Morsels/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
-				INFOPLIST_KEY_NSFileProviderDomainUsageDescription = "Morsels uses the microphone to recognize letter names so you can select pigs using your voice.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Morsels uses the microphone to recognize letter names so you can select pigs using your voice.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Morsels uses speech recognition to understand the letters you speak during gameplay.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
@@ -428,11 +442,12 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Morsels/Morsels.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = LGQJKP2RML;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Morsels/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
-				INFOPLIST_KEY_NSFileProviderDomainUsageDescription = "Morsels uses the microphone to recognize letter names so you can select pigs using your voice.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Morsels uses the microphone to recognize letter names so you can select pigs using your voice.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Morsels uses speech recognition to understand the letters you speak during gameplay.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;

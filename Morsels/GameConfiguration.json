@@ -1,0 +1,33 @@
+{
+  "levels": {
+    "beginner": {
+      "characterSpeed": 15.0,
+      "farnsworthSpeed": 10.0,
+      "penaltyDuration": 2.0,
+      "delayBetweenRounds": 4.0,
+      "preparationTime": 3.0,
+      "pigGravity": 0.3
+    },
+    "intermediate": {
+      "characterSpeed": 20.0,
+      "farnsworthSpeed": 15.0,
+      "penaltyDuration": 1.5,
+      "delayBetweenRounds": 3.0,
+      "preparationTime": 2.0,
+      "pigGravity": 0.4
+    },
+    "advanced": {
+      "characterSpeed": 25.0,
+      "farnsworthSpeed": 20.0,
+      "penaltyDuration": 1.0,
+      "delayBetweenRounds": 2.0,
+      "preparationTime": 1.5,
+      "pigGravity": 0.5
+    }
+  },
+  "gameplay": {
+    "maxFailedRounds": 3,
+    "minRoundLength": 1,
+    "maxRoundLength": 4
+  }
+}

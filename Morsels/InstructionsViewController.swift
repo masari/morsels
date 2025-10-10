@@ -32,30 +32,44 @@ class InstructionsViewController: UIViewController {
         contentStack.layoutMargins = UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
         contentStack.isLayoutMarginsRelativeArrangement = true
         
-        // Title
-        let titleLabel = UILabel()
-        titleLabel.text = "How to Play"
-        titleLabel.font = .systemFont(ofSize: 34, weight: .bold)
-        titleLabel.numberOfLines = 0
-        contentStack.addArrangedSubview(titleLabel)
-        
-        // Add spacing after title
-        let titleSpacer = UIView()
-        titleSpacer.translatesAutoresizingMaskIntoConstraints = false
-        titleSpacer.heightAnchor.constraint(equalToConstant: 10).isActive = true
-        contentStack.addArrangedSubview(titleSpacer)
-        
         // Instructions
         let instructions = [
             ("ear", "Listen carefully to the sequence of Morse code letters played at the start of each round."),
             ("hand.tap.fill", "Tap the falling pigs in the same sequence you heard."),
-            ("checkmark.circle.fill", "Correct taps will save the pigs and send them to the pigpen."),
+            ("checkmark.circle.fill", "Correct selections will save the pigs and send them to the pigpen."),
             ("xmark.octagon.fill", "An incorrect tap will trigger a brief penalty where you cannot select any pigs."),
             ("flame.fill", "Don't let the pigs fall into the grill! Too many failed rounds will end the game."),
-            ("pause.circle.fill", "Need a break? Tap the grill at any time to pause the game.")
+            ("arrow.up.circle.fill", "Progress through difficulty levels by mastering letters. The game adjusts speed and timing as you advance."),
+            ("pause.circle.fill", "Tap the grill at any time to pause the game.")
         ]
         
         for (icon, text) in instructions {
+            let row = InstructionRowView(icon: icon, text: text)
+            contentStack.addArrangedSubview(row)
+        }
+        
+        // Add a separator
+        let separator = UIView()
+        separator.backgroundColor = .separator
+        separator.translatesAutoresizingMaskIntoConstraints = false
+        separator.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        contentStack.addArrangedSubview(separator)
+        
+        // Tips section
+        let tipsLabel = UILabel()
+        tipsLabel.text = "Tips"
+        tipsLabel.font = .systemFont(ofSize: 24, weight: .bold)
+        tipsLabel.numberOfLines = 0
+        contentStack.addArrangedSubview(tipsLabel)
+        
+        let tips = [
+            ("lightbulb.fill", "Start with the Beginner level in Configuration to learn the basics with slower speeds and more time."),
+            ("waveform", "Focus on the rhythm and pattern of the Morse code rather than counting dots and dashes."),
+            ("speaker.wave.2.fill", "Adjust the Tone Pitch in Configuration to find a frequency that's comfortable for your ears."),
+            ("mic.fill", "Enable Voice Input in settings to speak the letters using the International Phonetic Alphabet instead of tapping.")
+        ]
+        
+        for (icon, text) in tips {
             let row = InstructionRowView(icon: icon, text: text)
             contentStack.addArrangedSubview(row)
         }

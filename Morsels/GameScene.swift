@@ -5,6 +5,7 @@
 
 import SpriteKit
 import GameplayKit
+import GameKit
 
 class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, SpeechRecognitionDelegate {
 
@@ -283,10 +284,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
                 guard let self = self else { return }
                 self.renderer.showGameOver(finalScore: self.scoreManager.score)
                 
-                // Only submit to leaderboard in Expert mode
-                if UserSettings.shared.isExpertMode {
-                    GameKitHelper.shared.submitScore(self.scoreManager.score, leaderboardID: GameKitHelper.leaderboardID)
-                }            }
+                // Submit to appropriate difficulty leaderboard (or skip if custom)
+                GameKitHelper.shared.submitScore(self.scoreManager.score, leaderboardID: GameKitHelper.leaderboardID)
+            }
         ]))
     }
     
@@ -450,7 +450,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate, GameSceneInputDelegate, Spee
     // In GameScene.swift - calculateMorseDuration method
     private func calculateMorseDuration(for letters: [Character]) -> TimeInterval {
         let characterSpeed = UserSettings.shared.morseCharacterSpeed
-        let farnsworthSpacing = UserSettings.shared.morseFarnsworthSpacing
+        let farnsworthSpacing = UserSettings.shared.morseFarnsworthSpeed
         
         // Calculate timing (same formula as MorseCodePlayer)
         let dotDuration = 1.2 / characterSpeed
